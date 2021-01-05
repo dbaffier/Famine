@@ -1,0 +1,33 @@
+rax	rdi	rsi	rdx	r10	r8	r9	rax
+
+
+
+Data segment infection
+    - Increase the section header offset (ELF Header) by VIRUS SIZE
+    - Change entrypoint to end of the data segnebt (vm addr + file size)
+    - Increase the BSS offset(in the section haeder) by VIRUS SIZE
+    - set the executable permission bit on the DATA segment. (Only for 64 bits)
+    - Insert the virus at the end of data section
+    - Virus should jump back to old entry point
+
+
+/ ! \
+ - Virus and host variables should not overlap (.data, .bss sections)
+ - 
+
+
+Virus workflow
+
+ - Check if the /tmp/test and /tmp/test2 exist else ABORT.
+ - Loop over binaries in the top folder
+ - Check if already infected
+ - Infect if not
+
+
+
+
+ Virus BONUS
+
+ - Infecting from '/' by launching every infected binaries
+ - Making virus smaller with packing maybe ??
+ - Launch under specific conditions ??
