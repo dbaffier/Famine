@@ -11,6 +11,9 @@ Data segment infection
     - Virus should jump back to old entry point
 
 
+Reverse text infection
+
+
 / ! \
  - Virus and host variables should not overlap (.data, .bss sections)
  - 
