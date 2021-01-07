@@ -1,11 +1,14 @@
 ASM = nasm
-ASMFLAGS = -f elf64 -F dwarf -g
+ASMFLAGS = -f elf64
 
 LD = ld
 LDFLAGS = -m elf_x86_64 -e _infect
 FAMINE := Famine
 
 all: $(FAMINE)
+
+debug: ASMFLAGS += -DDEBUG -F dwarf -g
+debug: all
 
 $(FAMINE): Famine.s
 	$(ASM) $(ASMFLAGS) $^
