@@ -3,7 +3,9 @@
 	.text
 	.section	.rodata
 .LC0:
-	.string	"%ld\n"
+	.string	"/tmp/test/ABC"
+.LC1:
+	.string	"A"
 	.text
 	.globl	main
 	.type	main, @function
@@ -16,27 +18,18 @@ main:
 	.cfi_offset 6, -16
 	mov	rbp, rsp
 	.cfi_def_cfa_register 6
-	sub	rsp, 32
-	mov	rax, QWORD PTR fs:40
-	mov	QWORD PTR -8[rbp], rax
-	xor	eax, eax
-	mov	DWORD PTR -20[rbp], 5
-	mov	DWORD PTR -12[rbp], 10
-	mov	DWORD PTR -16[rbp], 100
-	lea	rax, -16[rbp]
-	lea	rdx, -20[rbp]
-	sub	rax, rdx
-	sar	rax, 2
-	mov	rsi, rax
+	sub	rsp, 16
+	mov	esi, 0
 	lea	rdi, .LC0[rip]
 	mov	eax, 0
-	call	printf@PLT
+	call	open@PLT
+	mov	DWORD PTR -4[rbp], eax
+	mov	edx, 1
+	lea	rsi, .LC1[rip]
+	mov	edi, 1
 	mov	eax, 0
-	mov	rcx, QWORD PTR -8[rbp]
-	xor	rcx, QWORD PTR fs:40
-	je	.L3
-	call	__stack_chk_fail@PLT
-.L3:
+	call	write@PLT
+	mov	eax, 0
 	leave
 	.cfi_def_cfa 7, 8
 	ret

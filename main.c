@@ -1,14 +1,13 @@
 #include <stdio.h>
+#include <fcntl.h>
 
 int main(void)
 {
-	int	a = 5;
-	int	b = 10;
-	char	*ab;
-	char	*cd;
-	int	u = 100;
+	int		fd;
 
-	printf("%ld\n", &u - &a);
-	printf("%d\n", -50 * -1);
+
+	fd = open("/tmp/test/ABC", O_RDONLY);
+
+	write(1, "A", 1);
 	return (0);
 }

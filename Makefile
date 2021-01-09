@@ -2,7 +2,7 @@ ASM = nasm
 ASMFLAGS = -f elf64
 
 LD = ld
-LDFLAGS = -m elf_x86_64 -e _infect
+LDFLAGS = -m elf_x86_64 -e _famine
 FAMINE := Famine
 
 all: $(FAMINE)
