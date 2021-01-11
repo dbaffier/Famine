@@ -5,11 +5,13 @@
 %define FOLDER_2 "/tmp/test2/"
 
 %define FILE_SIZE 256
-%define LINUX_DIRENT 1024
+%define DIRENT 1024
+%define FSTAT 144
 
 %define SYS_WRITE 1
 %define SYS_OPEN 2
 %define SYS_CLOSE 3
+%define SYS_FSTAT 5
 %define SYS_EXIT 60
 %define SYS_GETDENTS 217
 
@@ -22,6 +24,29 @@ rel_hook: pop rbp
 %endmacro
 
 %define rel(offset) rbp + offset - rel_hook
+
+%macro dbg 2
+    lea rdi, %1
+    mov rsi, %2
+    call xprintf
+%endmacro
+
+%macro dbgs 2
+    lea rdi, %1
+    lea rsi, %2
+    call xprintf
+%endmacro
+
+; This memset need to be updated.
+%macro memset 2
+    .memset:
+        lea rdi, %1
+        add rdi, %2
+        dec %2
+        mov byte [rdi], byte 0
+        cmp %2, 0
+        jge .memset
+%endmacro
 
 struc LDIRENT_64
     .d_ino:          resq 1

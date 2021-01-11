@@ -3,14 +3,14 @@
 	.text
 	.section	.rodata
 .LC0:
-	.string	"/tmp/test/ABC"
+	.string	"/tmp/test/first_one"
 .LC1:
-	.string	"A"
+	.string	"size => %zu\n"
 	.text
 	.globl	main
 	.type	main, @function
 main:
-.LFB0:
+.LFB6:
 	.cfi_startproc
 	endbr64
 	push	rbp
@@ -18,23 +18,36 @@ main:
 	.cfi_offset 6, -16
 	mov	rbp, rsp
 	.cfi_def_cfa_register 6
-	sub	rsp, 16
+	sub	rsp, 176
+	mov	rax, QWORD PTR fs:40
+	mov	QWORD PTR -8[rbp], rax
+	xor	eax, eax
 	mov	esi, 0
 	lea	rdi, .LC0[rip]
 	mov	eax, 0
 	call	open@PLT
-	mov	DWORD PTR -4[rbp], eax
-	mov	edx, 1
-	lea	rsi, .LC1[rip]
-	mov	edi, 1
+	mov	DWORD PTR -164[rbp], eax
+	lea	rdx, -160[rbp]
+	mov	eax, DWORD PTR -164[rbp]
+	mov	rsi, rdx
+	mov	edi, eax
+	call	fstat@PLT
+	mov	rax, QWORD PTR -112[rbp]
+	mov	rsi, rax
+	lea	rdi, .LC1[rip]
 	mov	eax, 0
-	call	write@PLT
+	call	printf@PLT
 	mov	eax, 0
+	mov	rcx, QWORD PTR -8[rbp]
+	xor	rcx, QWORD PTR fs:40
+	je	.L3
+	call	__stack_chk_fail@PLT
+.L3:
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE0:
+.LFE6:
 	.size	main, .-main
 	.ident	"GCC: (Ubuntu 9.3.0-17ubuntu1~20.04) 9.3.0"
 	.section	.note.GNU-stack,"",@progbits
