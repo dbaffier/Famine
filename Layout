@@ -1,5 +1,7 @@
-rax	rdi	rsi	rdx	r10	r8	r9	rax
+rax	rdi	rsi	rdx	rcx, r8	,r9	rax
+rax, rdi, rsi, 10, r8, r9, STACK
 
+when using syscall RCX and R11 are destroyed
 
 
 Data segment infection

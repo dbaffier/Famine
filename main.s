@@ -3,9 +3,7 @@
 	.text
 	.section	.rodata
 .LC0:
-	.string	"/tmp/test/first_one"
-.LC1:
-	.string	"size => %zu\n"
+	.string	"/tmp/test2/TEST_2"
 	.text
 	.globl	main
 	.type	main, @function
@@ -26,17 +24,22 @@ main:
 	lea	rdi, .LC0[rip]
 	mov	eax, 0
 	call	open@PLT
-	mov	DWORD PTR -164[rbp], eax
+	mov	DWORD PTR -172[rbp], eax
 	lea	rdx, -160[rbp]
-	mov	eax, DWORD PTR -164[rbp]
+	mov	eax, DWORD PTR -172[rbp]
 	mov	rsi, rdx
 	mov	edi, eax
 	call	fstat@PLT
 	mov	rax, QWORD PTR -112[rbp]
 	mov	rsi, rax
-	lea	rdi, .LC1[rip]
-	mov	eax, 0
-	call	printf@PLT
+	mov	eax, DWORD PTR -172[rbp]
+	mov	r9d, 0
+	mov	r8d, eax
+	mov	ecx, 2
+	mov	edx, 3
+	mov	edi, 0
+	call	mmap@PLT
+	mov	QWORD PTR -168[rbp], rax
 	mov	eax, 0
 	mov	rcx, QWORD PTR -8[rbp]
 	xor	rcx, QWORD PTR fs:40

@@ -95,7 +95,6 @@ void xprintf(const char *fmt, ...)
 	xvprintf(fmt, arp);
 	va_end(arp);
 }
-#define printf xprintf
 
 #endif
 
