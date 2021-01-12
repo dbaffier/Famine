@@ -122,6 +122,13 @@ elf_header:
     mov rsi, [rbp - 16]
     cmp dword [rsi], 0x464c457f                             ; 7fELF
     jne next_file
+    .exec:
+        cmp dword [rsi + Elf64_Ehdr.e_type], ET_EXEC
+        jne .dyn
+    dyn:
+        cmp dword [rsi + Elf64_Ehdr.e_type], ET_DYN
+        jne next_file
+
 
     ; mov ax, word [rsi + Elf64_Ehdr.e_type]               ; We need to check for ET_EXEC or ET_DYN
 %ifdef DEBUG

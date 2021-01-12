@@ -9,6 +9,11 @@
 %define FSTAT 144
 %define MAPPED_FILE 8
 
+; ELF_DEFINITION
+%define ET_EXEC 2
+%define ET_DYN 3
+
+;SYSCALL
 %define SYS_WRITE 1
 %define SYS_OPEN 2
 %define SYS_CLOSE 3
