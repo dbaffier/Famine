@@ -9,9 +9,11 @@
 %define FSTAT 144
 %define MAPPED_FILE 8
 
+%define FAMINE_SIZE _end - _famine
+
 ; ELF_DEFINITION
-%define ET_EXEC 2
-%define ET_DYN 3
+%define ET_EXEC 0x02
+%define ET_DYN 0x03
 
 ;SYSCALL
 %define SYS_WRITE 1
@@ -44,6 +46,16 @@
     call printf
 %endmacro
 
+%define PAGE_SIZE 4096
+
+%macro PAGE_ALIGN 1
+    mov rcx, %1
+    mov rdi, PAGE_SIZE
+    dec rdi
+    not rdi
+    and rcx, rdi
+    add rcx, PAGE_SIZE
+%endmacro
 ; This memset need to be updated.
 %macro memset 2
     .memset:
@@ -70,7 +82,7 @@ struc Elf64_Ehdr
     .e_machine:          resw 1
     .e_version:          resd 1
     .e_entry:            resq 1
-    .e_phofff:           resq 1
+    .e_phoff:            resq 1
     .e_shoff:            resq 1
     .e_flags:            resd 1
     .e_ehsize:           resw 1
@@ -81,6 +93,16 @@ struc Elf64_Ehdr
     .e_shstrndx:         resw 1
 endstruc
 
+struc phdr64
+    .p_type:             resd 1
+    .p_flags:            resd 1
+    .p_offset:           resq 1
+    .p_vaddr:            resq 1
+    .p_paddr:            resq 1
+    .p_filesz:           resq 1
+    .p_memsz:            resq 1
+    .p_align:            resq 1
+endstruc
 
 ; DB allocates in chunks of 1 byte.
 ; DW allocates in chunks of 2 bytes.

