@@ -5,7 +5,9 @@
 .LC0:
 	.string	"/tmp/test/Hello"
 .LC1:
-	.string	"%lu\n"
+	.string	"%x\n"
+.LC2:
+	.string	"opop"
 	.text
 	.globl	main
 	.type	main, @function
@@ -18,7 +20,7 @@ main:
 	.cfi_offset 6, -16
 	mov	rbp, rsp
 	.cfi_def_cfa_register 6
-	sub	rsp, 192
+	sub	rsp, 176
 	mov	rax, QWORD PTR fs:40
 	mov	QWORD PTR -8[rbp], rax
 	xor	eax, eax
@@ -26,42 +28,24 @@ main:
 	lea	rdi, .LC0[rip]
 	mov	eax, 0
 	call	open@PLT
-	mov	DWORD PTR -188[rbp], eax
+	mov	DWORD PTR -168[rbp], eax
 	lea	rdx, -160[rbp]
-	mov	eax, DWORD PTR -188[rbp]
+	mov	eax, DWORD PTR -168[rbp]
 	mov	rsi, rdx
 	mov	edi, eax
 	call	fstat@PLT
-	mov	rax, QWORD PTR -112[rbp]
-	mov	rsi, rax
-	mov	eax, DWORD PTR -188[rbp]
-	mov	r9d, 0
-	mov	r8d, eax
-	mov	ecx, 2
-	mov	edx, 3
-	mov	edi, 0
-	call	mmap@PLT
-	mov	QWORD PTR -184[rbp], rax
-	mov	rax, QWORD PTR -184[rbp]
-	mov	QWORD PTR -176[rbp], rax
-	mov	rax, QWORD PTR -176[rbp]
-	mov	rdx, QWORD PTR 32[rax]
-	mov	rax, QWORD PTR -184[rbp]
-	add	rax, rdx
-	mov	QWORD PTR -168[rbp], rax
-	mov	rax, QWORD PTR -168[rbp]
-	mov	rax, QWORD PTR 8[rax]
-	mov	rsi, rax
+	mov	eax, DWORD PTR -136[rbp]
+	mov	esi, eax
 	lea	rdi, .LC1[rip]
 	mov	eax, 0
 	call	printf@PLT
-	mov	rax, QWORD PTR -168[rbp]
-	add	rax, 56
-	mov	rax, QWORD PTR 8[rax]
-	mov	rsi, rax
-	lea	rdi, .LC1[rip]
+	mov	eax, DWORD PTR -136[rbp]
+	mov	edx, eax
+	mov	esi, 577
+	lea	rdi, .LC2[rip]
 	mov	eax, 0
-	call	printf@PLT
+	call	open@PLT
+	mov	DWORD PTR -164[rbp], eax
 	mov	eax, 0
 	mov	rcx, QWORD PTR -8[rbp]
 	xor	rcx, QWORD PTR fs:40

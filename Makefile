@@ -6,10 +6,10 @@ LDFLAGS = -m elf_x86_64 -e _famine
 FAMINE := Famine
 FAMINE_DBG := Famine_dbg
 
+all: $(FAMINE)
+
 debug: ASMFLAGS += -DDEBUG -F dwarf -g
 debug: debug_all
-
-all: $(FAMINE)
 
 $(FAMINE): Famine.s
 	$(ASM) $(ASMFLAGS) $^

