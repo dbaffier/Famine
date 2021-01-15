@@ -1,5 +1,6 @@
 %include "header.asm"
 [BITS 64]
+default rel
 
 extern xprintf
 
