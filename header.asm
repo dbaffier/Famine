@@ -63,6 +63,7 @@
     and rcx, rdi
     add rcx, PAGE_SIZE
 %endmacro
+
 ; This memset need to be updated.
 %macro memset 2
     .memset:
