@@ -306,6 +306,10 @@ _v_stop:
     mov rdi, 0
     syscall
 
+    mov rsi, [rbp - 16]
+    mov rax, qword [rsi + Elf64_Ehdr.e_entry]
+    jmp rax
+
 hook:
     .folder_1:
         db FOLDER_1, 0

