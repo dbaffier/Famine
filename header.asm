@@ -146,6 +146,8 @@ struc shdr64
     .sh_entsize:         resq 1
 endstruc
 
+
+
 ; DB allocates in chunks of 1 byte.
 ; DW allocates in chunks of 2 bytes.
 ; DD allocates in chunks of 4 bytes.
