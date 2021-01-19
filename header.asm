@@ -26,6 +26,7 @@
 %define PF_R    0x4
 
 ;SYSCALL
+%define SYS_READ 0
 %define SYS_WRITE 1
 %define SYS_OPEN 2
 %define SYS_CLOSE 3
@@ -95,7 +96,7 @@
     mov rdx, %3
     mov rax, SYS_WRITE
     syscall
-%endmacro
+%endmacro    
 
 struc LDIRENT_64
     .d_ino:          resq 1
@@ -104,7 +105,6 @@ struc LDIRENT_64
     .d_type:         resb 1
     .d_name:         resb 1
 endstruc
-
 
 struc Elf64_Ehdr
     .e_ident:            resb 16
