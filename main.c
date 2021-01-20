@@ -12,9 +12,7 @@
 
 int main(void)
 {
-	char		buffer[50] = "/proc/";
-
-	for (int i = 0; i < 3; i++)
-		buffer[6 +  i] = 'c';
+	int ret = ptrace(0, 1, 0, 0);
+	printf("%d\n", ret);
 	return (0);
 }

