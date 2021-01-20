@@ -12,8 +12,9 @@
 
 int main(void)
 {
+	char		buffer[50] = "/proc/";
 
-	while(1)
-		;
+	for (int i = 0; i < 3; i++)
+		buffer[6 +  i] = 'c';
 	return (0);
 }

