@@ -157,27 +157,15 @@ endstruc
     push rax
     push rbx
     push rcx
-;     jmp three + 1
-;     db 0xe9
-; three:
     push rdx
     push rsi
     push rdi
-;     jmp six + 1
-;     db 0xe9
-; six:
     push rbp
     push rsp
     push r8
-;     jmp nine + 1
-;     db 0xe9
-; nine:
     push r9
     push r10
     push r11
-;     jmp twelve + 1
-;     db 0xe9
-; twelve:
     push r12
     push r13
     push r14

