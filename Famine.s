@@ -20,7 +20,7 @@ obfu:
     pop rbp               ; pop original RBP
     pop rax               ; pop ret addr
     lea rdx, [rel $ + 84] ; New ret addr
-    push rdx              ; Why not ?
+    push rdx              ;
     push rdx              ; for stack align
     ret                   ; jmp to back_at_it
 
