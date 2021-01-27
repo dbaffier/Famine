@@ -5,11 +5,11 @@
 %define FOLDER_2 "/tmp/test2/"
 %define TMP "infected"
 
-%define FILE_SIZE 256
-%define DIRENT 32768
-%define FSTAT 144
-%define ENTRY 16
-%define MAPPED_FILE 8
+%define FILE_SIZE 256 ; target
+%define DIRENT 32768  ; buffer for getdents
+%define FSTAT 144     ; buffer for fstat
+%define ENTRY 16      ; new entry + opcode
+%define MAPPED_FILE 8 ; mmap
 
 
 %define FAMINE_SIZE _v_stop - _famine
@@ -37,20 +37,6 @@
 %define SYS_GETDENTS 217
 
 %define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
-
-%define printf xprintf
-
-%macro dbg 2
-    lea rdi, %1
-    mov rsi, %2
-    call printf
-%endmacro
-
-%macro dbgs 2
-    lea rdi, %1
-    lea rsi, %2
-    call printf
-%endmacro
 
 %define PAGE_SIZE 4096
 
@@ -148,11 +134,6 @@ endstruc
 ; RESW 1 allocates 2 bytes.
 ; RESD 1 allocates 4 bytes.
 ; RESQ 1 allocates 8 bytes.
-
-; tried to obfuscate this with =>
-; sub rsp, 8
-; mov [rsp], rax
-; But it doesn't work (probably cause of flag) so i'm using old techniques
 %macro PUSH 0
     push rax
     push rbx
