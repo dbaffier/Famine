@@ -31,7 +31,7 @@
 ;   return result;
 ; }
 
-%define FAMINE_SIZE _v_stop - _famine
+%define FAMINE_SIZE _v_stop - _pestilence
 %define CHUNKS_SIZE _v_stop - obfu
 
 ; ELF_HDR_DEFINITION
@@ -56,7 +56,7 @@
 %define SYS_PTRACE 101
 %define SYS_GETDENTS 217
 
-%define SIGNATURE "Famine version 1.0 (c)oded by dbaffier"
+%define SIGNATURE "Pestilence version 1.0 (c)oded by dbaffier"
 
 %define PAGE_SIZE 4096
 

