@@ -265,8 +265,8 @@ next:
     mov rax, 61
     syscall
     mov eax, dword [rsp]
-    and eax, 65280
-    sar eax, 8
+    and eax, 65280  ; WEXIT
+    sar eax, 8      ; WEXIT
     cmp eax, 1
     jne anti_process
 
