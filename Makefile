@@ -2,16 +2,16 @@ ASM = nasm
 ASMFLAGS = -f elf64
 
 LD = ld
-LDFLAGS = -m elf_x86_64 -e _pestilence
-Pestilence := Pestilence
+LDFLAGS = -m elf_x86_64 -e _war
+War := War
 
-SRCS =  Pestilence.s
+SRCS =  War.s
 
 OBJS = $(SRCS:.s=.o)
 
-all: $(Pestilence)
+all: $(War)
 
-$(Pestilence): $(OBJS)
+$(War): $(OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@ 
 
 %.o: %.s
@@ -21,6 +21,6 @@ clean:
 	rm -f *.o
 
 fclean: clean
-	rm -f $(Pestilence)
+	rm -f $(War)
 
 re: fclean all

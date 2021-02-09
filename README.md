@@ -2,15 +2,20 @@
 
 # Virus
 
-- Infect all binaries `ET_EXEC & x86_64` on `/tmp/test/` and `/tmp/test2/` folders by injecting himself without altering the initial behavior of them.
+- Infect all binaries `ET_EXEC & x86_64` on `/tmp/test/` and `/tmp/test2/` folders without altering the initial behavior of them.
 
 # Features
 
-- Anti debugging with PTRACE
+- Anti debugging (anti traced)
 - Anti debugging with elapsed time between 2 block of code
+- Anti debugging with encryption
 - Doesn't infect if a specific `test` process is running
 - False disassembly
 - Code obfuscation
+- Random key hash generated
+- Encryption
+- Polymorphic/Metamorphic instruction on some blocks
+- Polymorphic fingerprint
 
 
 # Method
@@ -34,12 +39,3 @@ parasite:
 	[parasite] (new start of text)
 	[text]
 	[data]
-
-
-What's next ?
-
-- Reduce his size and optimized use of registers
-- Obfuscation of every "plain text" strings
-- Encryption
-- Polymorphism
-- Methamorphism
