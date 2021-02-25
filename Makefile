@@ -3,9 +3,9 @@ ASMFLAGS = -f elf64
 
 LD = ld
 LDFLAGS = -m elf_x86_64 -e _war
-War := War
+War := Death
 
-SRCS =  War.s
+SRCS =  Death.s
 
 OBJS = $(SRCS:.s=.o)
 
