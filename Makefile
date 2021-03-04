@@ -3,15 +3,15 @@ ASMFLAGS = -f elf64
 
 LD = ld
 LDFLAGS = -m elf_x86_64 -e _war
-War := War
+Death := Death
 
-SRCS =  War.s
+SRCS =  Death.s
 
 OBJS = $(SRCS:.s=.o)
 
-all: $(War)
+all: $(Death)
 
-$(War): $(OBJS)
+$(Death): $(OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@ 
 
 %.o: %.s
@@ -21,6 +21,6 @@ clean:
 	rm -f *.o
 
 fclean: clean
-	rm -f $(War)
+	rm -f $(Death)
 
 re: fclean all

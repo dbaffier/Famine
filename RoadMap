@@ -1,0 +1,59 @@
+------------ VIRUS
+	- Signature polymorphique
+	- Anti Debug GDB 1
+	- Anti Debug rdtsc
+	- Encryption with HASH KEY
+	- Decryption based on HASH KEY
+	- Anti debug HASH KEY
+	- Metamorphic CODE
+	- Polymorphic CODE
+
+How it work :
+
+----------------------------------------
+#       Check if encrypted             #
+----------------------------------------
+#             Decryption               #  => HASH is based on own code, if breakpoint => segfault
+----------------------------------------
+#            Obfuscation               #  => False static analysis and readability
+----------------------------------------
+#       Anti debug 1 (ptrace)          #  => Error = exit
+----------------------------------------
+#       Anti process ('test')          #  => Found = exit
+----------------------------------------
+#       Anti debug 2 (time elapsed)    #  => Error = exit
+----------------------------------------
+#          Loop DIR start              #  => Error = Next DIR
+----------------------------------------	
+#          Open target dir             #  => Error = Next DIR
+---------------------------------------
+#         Loop FILE start              #  => Error = Next FILE
+---------------------------------------- 
+#          File integrity              #  => Error = Next FILE
+----------------------------------------
+#     Patch file to put our Virus      #
+----------------------------------------
+#     Create mimic file                #  => Error = Next FILE
+----------------------------------------
+#     Polymorphism to our CODE         #  => Can't FAIL
+----------------------------------------
+#     Metamorphism to our CODE         #  => Can't FAIL.
+----------------------------------------
+#     Create HASH based on new code    #
+----------------------------------------
+#     Encrypt himself with HASH        #
+----------------------------------------
+#       Write himself in new file      #
+----------------------------------------
+#       Polymorphique Signature        #
+----------------------------------------
+#          Replce actual target file   #  => Error => next FILE
+----------------------------------------
+#          Clear reg / stack           #
+----------------------------------------
+#          Next FILE                   #
+----------------------------------------
+#          Next DIR                    #
+----------------------------------------
+#          Clear reg / stack           #
+----------------------------------------

